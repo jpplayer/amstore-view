@@ -27,8 +27,8 @@ limitations under the License. Kerberos, LDAP, Custom. Binary/Htt
   <parameter>
     <name>amstore.url</name>
     <description>The URL of the backend Ambari Store Service</description>
-	<default-value>http://amstore.cloud.hortonworks.com:5025</default-value>
-	<placeholder>http://amstore.cloud.hortonworks.com:5025</placeholder>
+	<default-value>http://ec2-54-184-106-70.us-west-2.compute.amazonaws.com:5025</default-value>
+	<placeholder>http://ec2-54-184-106-70.us-west-2.compute.amazonaws.com:5025</placeholder>
     <required>true</required>
   </parameter>
   
