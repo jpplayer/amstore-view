@@ -165,8 +165,8 @@ wait_for_ambari
 #echo "Installing agent service"
 #create_agent
 #echo "Creating view instance"
-create_instance2
-#create_instance
+#create_instance2
+create_instance
 #Couldn't do in deploy() so doing here.
 reconfigure_instance
 echo ""
