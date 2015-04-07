@@ -1,0 +1,23 @@
+app_id: store
+type: VIEW
+category: administration
+homepage: https://github.com/jpplayer/amstore.git
+storefront: none
+logo: hortonworks.jpg
+packager: Jean-Philippe Player jp@hortonworks.com
+package: ambari-store-view-0.1.0.jar
+readiness: experimental
+tags: 
+ - admin
+
+view_name: AMBARI-STORE
+version: '0.1.0'
+instance_name: store
+display_name: Ambari Store
+description: Application store for Apache Ambari
+visible: True
+properties: 
+   
+permissions: 
+    group: 
+       - admins

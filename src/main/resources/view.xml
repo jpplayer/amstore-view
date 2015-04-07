@@ -1,0 +1,156 @@
+<!--
+Licensed to the Apache Software Foundation (ASF) under one or more
+contributor license agreements. See the NOTICE file distributed with
+this work for additional information regarding copyright ownership.
+The ASF licenses this file to You under the Apache License, Version 2.0
+(the "License"); you may not use this file except in compliance with
+the License. You may obtain a copy of the License at
+
+http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License. Kerberos, LDAP, Custom. Binary/Htt
+-->
+<view>
+  <name>AMBARI-STORE</name>
+  <version>0.1.0</version>
+  <view-class>com.hortonworks.amstore.view.StoreManager</view-class>
+ 
+  <resource>
+    <name>taskmanager</name>
+	<service-class>com.hortonworks.amstore.view.TaskManagerService</service-class>
+  </resource>
+ 
+  <parameter>
+    <name>amstore.url</name>
+    <description>The URL of the backend Ambari Store Service</description>
+	<default-value>http://amstore.cloud.hortonworks.com:5025</default-value>
+	<placeholder>http://amstore.cloud.hortonworks.com:5025</placeholder>
+    <required>true</required>
+  </parameter>
+  
+  <parameter>
+    <name>amstore.ambari.local.url</name>
+    <description>The URL of the Ambari where the Store is installed</description>
+	<default-value>http://localhost:8080</default-value>
+	<placeholder>http://localhost:8080</placeholder>
+    <required>true</required>
+  </parameter>
+
+  <parameter>
+    <name>amstore.ambari.local.username</name>
+    <description>The username of an administrator for the local Ambari</description>
+	<default-value>admin</default-value>
+	<placeholder>admin</placeholder>
+    <required>true</required>
+  </parameter>
+
+  <parameter>
+    <name>amstore.ambari.local.password</name>
+    <description>The password of an administrator for the local Ambari</description>
+	<default-value>admin</default-value>
+	<placeholder>admin</placeholder>
+	<masked>false</masked>
+    <required>true</required>
+  </parameter>
+  
+  <parameter>
+    <name>amstore.ambari.cluster.url</name>
+    <description>The URL of a remote Ambari Server that is managing a cluster (if different from local)</description>
+	<default-value></default-value>
+	<placeholder>http://ambari.example.com:8080</placeholder>
+    <required>false</required>
+  </parameter>
+
+  <parameter>
+    <name>amstore.ambari.cluster.username</name>
+    <description>The username of an administrator for the remote server</description>
+	<default-value></default-value>
+	<placeholder>admin</placeholder>
+    <required>false</required>
+  </parameter>
+
+  <parameter>
+    <name>amstore.ambari.cluster.password</name>
+    <description>The password of an administrator</description>
+	<default-value></default-value>
+	<placeholder>admin</placeholder>
+	<masked>false</masked>
+    <required>false</required>
+  </parameter>
+
+  <parameter>
+    <name>amstore.stack.version</name>
+    <description>Stack version for Services</description>
+	<default-value>2.1</default-value>
+	<placeholder>2.1</placeholder>
+    <required>false</required>
+  </parameter>
+
+  
+  <parameter>
+    <name>amstore.webhdfs.url</name>
+    <description>Webhdfs Url</description>
+	<placeholder>webhdfs://namenode:50070</placeholder>
+    <required>false</required>
+  </parameter>
+
+  <parameter>
+    <name>amstore.webhdfs.username</name>
+    <description>Webhdfs username</description>
+    <required>false</required>
+  </parameter>
+  
+  <parameter>
+    <name>amstore.webhdfs.auth</name>
+    <description>Webhdfs authentication</description>
+    <required>false</required>
+  </parameter>
+
+  <parameter>
+    <name>amstore.webhcat.url</name>
+    <description>Webhcat Url</description>
+    <required>false</required>
+  </parameter>
+  
+  
+  <parameter>
+    <name>amstore.yarn.rm.url</name>
+    <description>Yarn Resource Manager Url</description>
+	<placeholder>http://resourcemanager:8088</placeholder>
+    <required>false</required>
+  </parameter>
+  
+  <parameter>
+    <name>amstore.yarn.ats.url</name>
+    <description>Yarn Application Timeline Server Url</description>
+	<placeholder>http://timelineserver:8188</placeholder>
+    <required>false</required>
+  </parameter>
+
+  <parameter>
+    <name>amstore.hiveserver2.host</name>
+    <description>Hiveserver2 host</description>
+	<placeholder>hiveserver.example.com</placeholder>
+    <required>false</required>
+  </parameter>
+
+  <parameter>
+    <name>amstore.hiveserver2.port</name>
+    <description>Hiveserver2 port</description>
+    <default>10000</default>
+	<placeholder>10000</placeholder>
+    <required>false</required>
+  </parameter>
+  
+  <parameter>
+    <name>amstore.hiveserver2.auth</name>
+    <description>Hiveserver2 authentication</description>
+	<default-value>auth=NONE;user={{username}}</default-value>
+    <required>false</required>
+  </parameter>
+  
+</view>

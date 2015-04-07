@@ -1,0 +1,41 @@
+<?xml version="1.0"?>
+<metainfo>
+    <schemaVersion>2.0</schemaVersion>
+    <services>
+        <service>
+            <name>STOREAGENT</name>
+            <displayName>Store</displayName>
+            <comment>Store Agent</comment>
+            <version>0.1.0</version>
+            <components>
+                <component>
+                    <name>STORE_CLIENT</name>
+                    <displayName>Store Client</displayName>
+                    <category>CLIENT</category>
+                    <cardinality>1+</cardinality>
+                    <commandScript>
+                        <script>store_client.py</script>
+                        <scriptType>PYTHON</scriptType>
+                        <timeout>600</timeout>
+                    </commandScript>
+                    <customCommands>
+                      <customCommand>
+                        <name>RESTART_AMBARI</name>
+                        <commandScript>
+                          <script>store_client.py</script>
+                          <scriptType>PYTHON</scriptType>
+                          <timeout>600</timeout>
+                        </commandScript>
+                      </customCommand>
+                    </customCommands>
+                </component>
+            </components>
+            <osSpecifics>
+                <osSpecific>
+                    <osFamily>any</osFamily>  <!-- note: use osType rather than osFamily for Ambari 1.5.0 and 1.5.1 -->
+                </osSpecific>
+            </osSpecifics>
+            
+        </service>
+    </services>
+</metainfo>
