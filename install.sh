@@ -8,7 +8,7 @@ CURL='curl'
 CREDENTIALS="admin:admin" 
 agent="store-installer"
 VERSION="0.1.0"
-
+USE_DEMO_SERVER=no
 
 read -d '' data << EOF
 [{ 
@@ -30,10 +30,13 @@ Example: ./install.sh -u operator:hadoop
 EOF
 }
 
-while getopts ":u:" opt; do
+while getopts ":u:d" opt; do
 	case "$opt" in
 	u)
 		CREDENTIALS=${OPTARG}
+	;;
+	d)
+		USE_DEMO_SERVER=yes
 	;;
 	\?)
 		echo "Invalid option: -$OPTARG" >&2
@@ -164,9 +167,13 @@ wait_for_ambari
 # Forget about agent, a Views server won't allow it.
 #echo "Installing agent service"
 #create_agent
-#echo "Creating view instance"
-#create_instance2
-create_instance
+echo "Creating view instance"
+if [[ "${USE_DEMO_SERVER}" == "yes" ]]; then
+	create_instance2
+else
+	create_instance
+fi
+
 #Couldn't do in deploy() so doing here.
 reconfigure_instance
 echo ""

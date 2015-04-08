@@ -81,11 +81,13 @@ public class AmbariStoreServlet extends HttpServlet {
 		response.setContentType("text/html");
 		response.setStatus(HttpServletResponse.SC_OK);
 
+		bootstrapjs(response);
+		
 		// DELETE THIS
 		debugWriter = response.getWriter();
 
-		// bootstrap( response );
-
+		debugWriter.println("<h2>Ambari Store</h2>");
+		
 		try {
 
 			// TODO: remove use of global variable endpointIssues
@@ -127,6 +129,8 @@ public class AmbariStoreServlet extends HttpServlet {
 			HttpServletResponse response) throws ServletException, IOException {
 		response.setContentType("text/html");
 		response.setStatus(HttpServletResponse.SC_OK);
+
+		bootstrapjs(response);
 
 		PrintWriter writer = response.getWriter();
 
@@ -228,7 +232,7 @@ public class AmbariStoreServlet extends HttpServlet {
 				.netgetApplicationFromStoreByUri(availableApplications
 						.get(app_id).uri);
 
-		writer.println("<table>");
+		writer.println("<table class=table>");
 		writer.println("<tr><td>Display Name</td><td><b>"
 				+ app.instanceDisplayName + "</b></td></tr>");
 		writer.println("<tr></tr>");
@@ -273,7 +277,8 @@ public class AmbariStoreServlet extends HttpServlet {
 		List<String> tasks = mainStoreApplication.getPostInstallTasks();
 		if (tasks.size() != 0) {
 			writer.println("<h3>Installation steps remaining.</h3> After restarting Ambari, click \"Finish Installations\" to complete the installation. The following applications need a restart or finalize:");
-			writer.println("<br><table BORDER=1 CELLPADDING=3 CELLSPACING=1 RULES=COLS FRAME=VSIDES><tr>");
+			writer.println("<br><table class=table><tr>");
+//			writer.println("<br><table BORDER=1 CELLPADDING=3 CELLSPACING=1 RULES=COLS FRAME=VSIDES><tr>");
 			for (String uri : tasks) {
 				StoreApplication application = BackendStoreEndpoint
 						.netgetApplicationFromStoreByUri(uri);
@@ -283,14 +288,22 @@ public class AmbariStoreServlet extends HttpServlet {
 			writer.println("</tr></table>");
 		}
 
-		writer.println("<h1>All Applications</h1>");
 		writer.println("<form name=\"input\" method=\"POST\">");
 
 		writer.println("<input type=\"submit\" value=\"Check for updates\" name=\"check_updates\"/>");
 		writer.println("<input type=\"submit\" value=\"Restart Ambari\" name=\"restart_ambari\"/>");
 		writer.println("<input type=\"submit\" value=\"Finish installations\" name=\"post_install\"/>");
+		writer.println("<p></p>");
 
-		writer.println("<table border=\"1\" style=\"width:100%\">");
+		
+		writer.println("<div class=\"panel panel-success\">\n" + 
+				"  <!-- Default panel contents -->\n" + 
+				"  <div class=\"panel-heading\">All Applications</div>\n" + 
+				"  <div class=\"panel-body\">\n" + 
+				"    <p> Please select the applications you want to install. </p>\n" + 
+				"  </div>");
+		
+		writer.println("<table class=table>");
 		writer.println("<tr>");
 		writer.println("<th>Category</th>");
 		writer.println("<th>Name</th>");
@@ -350,6 +363,7 @@ public class AmbariStoreServlet extends HttpServlet {
 		}
 
 		writer.println("</table>");
+		writer.println("</div>");
 		writer.println("<br/>");
 		writer.println("<input type=\"submit\" value=\"Install Selected\" name=\"install\"/>");
 		writer.println("<input type=\"submit\" value=\"Update Selected\" name=\"update\"/>");
@@ -452,13 +466,7 @@ public class AmbariStoreServlet extends HttpServlet {
 		writer.println(output);
 	}
 
-	protected void bootstrap(HttpServletResponse response) throws IOException {
-		PrintWriter writer = response.getWriter();
-		writer.println(" <link href=\"css/bootstrap.min.css\" rel=\"stylesheet\">");
 
-		writer.println("<script src=\"https://ajax.googleapis.com/ajax/libs/jquery/1.11.2/jquery.min.js\"></script>");
-		writer.println("<script src=\"js/bootstrap.min.js\"></script>");
-	}
 
 	// We get called if endpointChecks == false
 	private void displayChecks(HttpServletRequest request,
@@ -581,4 +589,27 @@ public class AmbariStoreServlet extends HttpServlet {
 		// writer.println( "<script>location.reload(true)</script>");
 	}
 
+	
+	protected void bootstrapjs(HttpServletResponse response) throws IOException{
+		PrintWriter writer = response.getWriter();
+		writer.println("		<!-- Latest compiled and minified CSS -->\n" + 
+				"	<head>	<link rel=\"stylesheet\" href=\"https://maxcdn.bootstrapcdn.com/bootstrap/3.3.4/css/bootstrap.min.css\">\n" + 
+				"\n" + 
+				"		<!-- Optional theme -->\n" + 
+				"		<link rel=\"stylesheet\" href=\"https://maxcdn.bootstrapcdn.com/bootstrap/3.3.4/css/bootstrap-theme.min.css\">\n" + 
+				"\n" + 
+				"		<!-- Latest compiled and minified JavaScript -->\n" + 
+				"		<script src=\"https://maxcdn.bootstrapcdn.com/bootstrap/3.3.4/js/bootstrap.min.js\"></script>\n" + 
+				"</head>");
+		
+	}
+	
+	/*
+	protected void bootstrap(HttpServletResponse response) throws IOException {
+		PrintWriter writer = response.getWriter();
+		writer.println(" <link href=\"css/bootstrap.min.css\" rel=\"stylesheet\">");
+
+		writer.println("<script src=\"https://ajax.googleapis.com/ajax/libs/jquery/1.11.2/jquery.min.js\"></script>");
+		writer.println("<script src=\"js/bootstrap.min.js\"></script>");
+	}*/
 }
