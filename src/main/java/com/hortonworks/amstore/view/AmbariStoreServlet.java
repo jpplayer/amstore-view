@@ -252,8 +252,11 @@ public class AmbariStoreServlet extends HttpServlet {
 				+ "</td></tr>");
 		writer.println("<tr><td>Description</td><td>" + app.description
 				+ "</td></tr>");
-		writer.println("<tr><td>Homepage</td><td>" + app.homepage
-				+ "</td></tr>");
+		writer.println("<tr><td>Homepage</td><td><a target='_blank' href='" 
+				+ app.homepage
+				+ "'>"
+				+ app.homepage
+				+ "</a></td></tr>");
 		writer.println("<tr><td>Properties</td></tr>");
 		writer.println("<tr></tr>");
 
