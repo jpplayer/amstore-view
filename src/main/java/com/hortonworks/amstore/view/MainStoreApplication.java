@@ -25,8 +25,6 @@ public class MainStoreApplication extends StoreApplication {
 	protected AmbariEndpoint ambariViews = null;
 	protected AmbariEndpoint ambariCluster = null;
 	protected BackendStoreEndpoint storeEndpoint = null;
-	
-	
 
 	public MainStoreApplication(ViewContext viewContext) {
 		// TODO: remove hard coded values and pick up from configuration !
@@ -139,31 +137,28 @@ public class MainStoreApplication extends StoreApplication {
 
 	// Always returns the version that is or will soon be installed
 	// TODO: make this more efficient, we should not be re-indexing every time
-	public String getInstalledVersion( StoreApplication app ){
+	/*
+	public String getInstalledVersion(StoreApplication app) {
 		
-		if (getInstalledApplications().containsKey( app.getInstanceName() )) {
+		if (getInstalledApplications().containsKey(app.getInstanceName())) {
 			// Double check that the ViewName matches !
-			String installedViewName = getInstalledApplications().get( app.getInstanceName() )
-					.getViewName();
+			String installedViewName = getInstalledApplications().get(
+					app.getInstanceName()).getViewName();
 
-			
 			// TODO: Might want to throw an Exception
-			/*
-			if( ! app.getViewName().equals(installedViewName)) {
-				return null;
-			}*/
-						
 			
+			  if( ! app.getViewName().equals(installedViewName)) { return null;
+			 }
+			 
+
 			ViewDefinition viewDefinition = getInstalledApplications().get(
 					app.getInstanceName()).getViewDefinition();
 			return viewDefinition.getVersion();
-		}
-		else {
+		} else {
 			return null;
 		}
-		
-	}
-	
+	}*/
+
 	public AmbariEndpoint getAmbariViews() {
 		AmbariEndpoint ambariViewsConfig = AmbariEndpoint
 				.getAmbariLocalEndpoint(viewContext.getProperties());
@@ -180,40 +175,79 @@ public class MainStoreApplication extends StoreApplication {
 				.getProperties());
 	}
 
-	public Map<String, ViewInstanceDefinition> getInstalledApplications() {
+    // Indexed by instanceName	
+	public Map<String, ViewInstanceDefinition> getInstalledViews() {
 		Map<String, ViewInstanceDefinition> installedApplications = new TreeMap<String, ViewInstanceDefinition>();
 
 		Collection<ViewInstanceDefinition> viewDefinitions = getViewContext()
 				.getViewInstanceDefinitions();
 		for (ViewInstanceDefinition instance : viewDefinitions) {
 			installedApplications.put(instance.getInstanceName(), instance);
-		} 
+		}
 		return installedApplications;
-
-		
 	}
 
-	public String deleteApplication(String app_id) {
-		// Indexed by instanceName not app_id
-		// TODO: this is completely overkill ! Get directly details for that
-		// version.
+	public Map<String, StoreApplication> getInstalledApplications() {
+		Map<String, StoreApplication> installedApplications = new TreeMap<String, StoreApplication>();
+
+		Collection<ViewInstanceDefinition> viewDefinitions = getViewContext()
+				.getViewInstanceDefinitions();
+		for (ViewInstanceDefinition instance : viewDefinitions) {
+			installedApplications.put(
+					instance.getInstanceName(), 
+					new StoreApplication( viewContext, instance )
+					);
+		}
+		return installedApplications;
+	}
+	
+	// TODO: very inefficient at many levels
+	public StoreApplication getInstalledApplicationByAppId( String appId ) {
+
 		StoreApplication app = getStoreEndpoint().getAllApplicationsFromStore()
-				.get(app_id);
+				.get(appId);
+		
+		Collection<ViewInstanceDefinition> viewDefinitions = getViewContext()
+				.getViewInstanceDefinitions();
+		for (ViewInstanceDefinition instance : viewDefinitions) {
+			if( instance.getInstanceName().equals( app.getInstanceName())){
+
+				// Return the fully populated application
+				// Match against appId + version
+				
+				return storeEndpoint.netgetApplicationFromStoreByAppId(appId, instance.getViewDefinition().getVersion());
+			}
+			
+		}
+		return null;
+	}
+
+	public String deleteApplication(String appId) {
+		
+		// Get the installed version first
+		StoreApplication installedApplication = this.getInstalledApplicationByAppId(appId);
+/*		
 		ViewInstanceDefinition view = getInstalledApplications().get(
 				app.instanceName);
 
+		
+		if (installedApplications.containsKey(app.getInstanceName())) {
+			writer.println(installedApplications.get(app.getInstanceName()).getVersion());
+		}
+*/
+		
+		
 		String url = "";
 		String response = "";
-		
-		if ( view == null )
+
+		if (installedApplication == null)
 			return "Not found.";
 
 		// Note: we must get the information about this exact version, not any
 		// new version that might show up on the app store.
-		url = "/api/v1/views/" + view.getViewDefinition().getViewName()
-				+ "/versions/" + view.getViewDefinition().getVersion()
-				+ "/instances/" + view.getInstanceName();
-	
+		url = "/api/v1/views/" + installedApplication.getViewName()
+				+ "/versions/" + installedApplication.getVersion()
+				+ "/instances/" + installedApplication.getInstanceName();
 
 		response += "Attempting to delete: '" + url + "'.<br>";
 		return response
@@ -223,57 +257,53 @@ public class MainStoreApplication extends StoreApplication {
 	}
 
 	// TODO: make this more efficient
-	public String eraseApplication(String app_id) {
+	/*
+	 * Removes the view, associated files and instances. If an instance exists,
+	 * it gets removed. Requires a restart to complete. Assert: the view must be
+	 * instantiated
+	 */
+	public String eraseApplication(String appId) {
 		String response = "";
 
-		// We remove all related files
-		// Indexed by instanceName not app_id. We must first determine the name
-		// of the
-		// managed instance
-		StoreApplication newapp = getStoreEndpoint()
-				.getAllApplicationsFromStore().get(app_id);
+		// Get the latest version
+		StoreApplication latestAppAvailable = getStoreEndpoint()
+				.getAllApplicationsFromStore().get(appId);
 
-		// WARNING: make sure we use the ViewInstanceDefinition information !
-		// This MUST be deon *before* deleting the viewInstance.
-		// However, the package name can *only* come from the backend.
-		ViewInstanceDefinition view = getInstalledApplications().get(
-				newapp.instanceName);
-
-		if ( view == null )
-			return "Not found.";
-		StoreApplication oldapp = getStoreEndpoint()
-				.netgetApplicationFromStoreByAppId(app_id,
-						view.getViewDefinition().getVersion());
-		if (oldapp == null) {
+		if (latestAppAvailable == null) {
 			// The app was not found in the backend.
 			response += "Application "
-					+ app_id
+					+ appId
+					+ " was not found in the Store. If this app is not managed by the store it cannot be deleted via the store.";
+			return response;
+		}		
+		
+     	// Get the installed version
+		StoreApplication installedApplication = this.getInstalledApplicationByAppId(appId);
+		
+		if (installedApplication == null) {
+			// The only way to get here is if we tried to delete a version that is
+			// not defined in the store
+			ViewInstanceDefinition instance = this.getInstalledViews().get( latestAppAvailable.getInstanceName());
+			
+			response += "Application "
+					+ appId
 					+ " with version "
-					+ view.getViewDefinition().getVersion()
+					+ instance.getViewDefinition().getVersion()
 					+ " was not found in the Store. Cannot delete information on disk.";
 			// throw new GenericException( "Application " + app_id +
 			// " with version " + view.getViewDefinition().getVersion()
 			// +
 			// " was not found in the Store. Cannot delete information on disk."
 			// );
-		} else {
 
-			String workDirectory = oldapp.getPackageWorkdir();
-			String packagePath = oldapp.getPackageFilepath();
-			try {
-				response += "Deleting " + packagePath + " and " + workDirectory
-						+ ".<br>";
-				FileUtils.deleteDirectory(new File(workDirectory));
-				FileUtils.forceDelete(new File(packagePath));
+			return response;
+		}		
+		
 
-			} catch (IOException e) {
-				response += "Something went wrong deleting " + workDirectory
-						+ " or " + packagePath + "<br>";
-			}
-		}
+		response += installedApplication.deleteApplicationFiles();
 
 		// We don't need the viewInstance anymore so we delete it now
-		response += deleteApplication(app_id);
+		response += deleteApplication(appId);
 		/*
 		 * TODO
 		 * 
@@ -282,52 +312,50 @@ public class MainStoreApplication extends StoreApplication {
 		 */
 		return response;
 	}
-	
+
 	public String updateApplication(String app_id) {
 		String response = "";
 
 		// This deletes any *existing* viewInstance and removes files
 		response += eraseApplication(app_id);
-		
+
 		// This installs the new view
 		response += installApplication(app_id);
-		
+
 		return response;
-	
-	}	
-	
-	
+
+	}
+
 	// TODO: Move into mainStoreApplication when feedback can be provided
 	// dynamically
 	public String installApplication(String app_id) {
 
-		String response =  "Starting downloads.<br>";
+		String response = "Starting downloads.<br>";
 
-		Map<String, StoreApplication> availableApplications = getStoreEndpoint().getAllApplicationsFromStore();
+		Map<String, StoreApplication> availableApplications = getStoreEndpoint()
+				.getAllApplicationsFromStore();
 
-			StoreApplication app = availableApplications.get(app_id);
-			// Verify that there is a package to download
-			if (app.package_uri != null) {
-				// Check whether the file is already present (do not
-				// re-download)
-				String targetPath = app.getPackageFilepath();
-				File file = new File(targetPath);
+		StoreApplication app = availableApplications.get(app_id);
+		// Verify that there is a package to download
+		if (app.package_uri != null) {
+			// Check whether the file is already present (do not
+			// re-download)
+			String targetPath = app.getPackageFilepath();
+			File file = new File(targetPath);
 
-				if (!file.isFile()) {
-					response += "Downloading " + app.package_uri
-							+ " to " + targetPath + "<br>";
-					// How can we do this in a thread and provide download
-					// update ? TODO
-					AmbariStoreHelper.downloadFile(app.package_uri, targetPath);
-				} else {
-					response +=
-							"File already available. Not downloading.<br>";
-				}
-				addPostInstallTask(app.uri);
+			if (!file.isFile()) {
+				response += "Downloading " + app.package_uri + " to "
+						+ targetPath + "<br>";
+				// How can we do this in a thread and provide download
+				// update ? TODO
+				AmbariStoreHelper.downloadFile(app.package_uri, targetPath);
+			} else {
+				response += "File already available. Not downloading.<br>";
 			}
-			return response;
+			addPostInstallTask(app.uri);
 		}
-
+		return response;
+	}
 
 	/*
 	 * Obtain all possible endpoints. This is currently dynamic !! (makes
@@ -490,8 +518,8 @@ public class MainStoreApplication extends StoreApplication {
 			}
 		} catch (ParseException pe) {
 			// not supposed to happen !
-			//throw new GenericException(
-			//		"Error Parsing JSON in getPostInstallTasks()");
+			// throw new GenericException(
+			// "Error Parsing JSON in getPostInstallTasks()");
 		}
 
 		return tasklist;
@@ -543,19 +571,21 @@ public class MainStoreApplication extends StoreApplication {
 
 				try {
 
-					Map<String, ViewInstanceDefinition> installedApplications = getInstalledApplications();
+					Map<String, ViewInstanceDefinition> installedViews = getInstalledViews();
 
-					if (installedApplications
+					if (installedViews
 							.containsKey(application.instanceName)) {
 
-						ViewDefinition viewDefinition = installedApplications
+						ViewDefinition viewDefinition = installedViews
 								.get(application.instanceName)
 								.getViewDefinition();
 						response += "found potentially matching view: "
 								+ viewDefinition.getVersion() + "<br>";
 
-						// We use the instanceName to identify a view, but there is a possibility
-						// of a conflict with a user-defined view. We at least check that the
+						// We use the instanceName to identify a view, but there
+						// is a possibility
+						// of a conflict with a user-defined view. We at least
+						// check that the
 						// viewName also matches.
 						if (!viewDefinition.getViewName().equals(
 								application.viewName)) {
@@ -628,19 +658,20 @@ public class MainStoreApplication extends StoreApplication {
 		String url = "/api/v1/views/" + this.getViewName() + "/versions/"
 				+ this.version + "/instances/" + this.instanceName
 				+ "/resources/taskmanager/postinstalltasks";
-		
-		if ( getPostInstallTasks().contains( task )) {
+
+		if (getPostInstallTasks().contains(task)) {
 			return "Already added.";
 		}
-		
-		response += AmbariStoreHelper.doPost(viewContext.getURLStreamProvider(),
-				ambariViews, url, task);
-		
+
+		response += AmbariStoreHelper.doPost(
+				viewContext.getURLStreamProvider(), ambariViews, url, task);
+
 		// Check that it was added correctly
-		if ( ! getPostInstallTasks().contains( task )) {
-			throw new RuntimeException("Failed to add post-install-task correctly");
+		if (!getPostInstallTasks().contains(task)) {
+			throw new RuntimeException(
+					"Failed to add post-install-task correctly");
 		}
-		
+
 		return response;
 
 	}

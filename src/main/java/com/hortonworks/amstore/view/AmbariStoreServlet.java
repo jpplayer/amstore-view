@@ -82,12 +82,12 @@ public class AmbariStoreServlet extends HttpServlet {
 		response.setStatus(HttpServletResponse.SC_OK);
 
 		bootstrapjs(response);
-		
+
 		// DELETE THIS
 		debugWriter = response.getWriter();
 
 		debugWriter.println("<h2>Ambari Store</h2>");
-		
+
 		try {
 
 			// TODO: remove use of global variable endpointIssues
@@ -185,7 +185,7 @@ public class AmbariStoreServlet extends HttpServlet {
 			} else if (action.equals("post_install")) {
 				mainStoreApplication.doPostInstallTasks();
 				writer.println("Complete. Please refresh your browser.");
-//				redirectHome(response);
+				// redirectHome(response);
 			} else { // First form
 				String[] checked = null;
 				if (request.getParameter("checked") != null) {
@@ -246,17 +246,14 @@ public class AmbariStoreServlet extends HttpServlet {
 				+ "</td></tr>");
 		writer.println("<tr><td>Readiness</td><td>" + app.readiness
 				+ "</td></tr>");
-		writer.println("<tr><td>Contributed by</td><td>" + escapeHtml(app.getContributor())
-				+ "</td></tr>");
-		writer.println("<tr><td>Packaged by</td><td>" + escapeHtml(app.getPackager())
-				+ "</td></tr>");
+		writer.println("<tr><td>Contributed by</td><td>"
+				+ escapeHtml(app.getContributor()) + "</td></tr>");
+		writer.println("<tr><td>Packaged by</td><td>"
+				+ escapeHtml(app.getPackager()) + "</td></tr>");
 		writer.println("<tr><td>Description</td><td>" + app.description
 				+ "</td></tr>");
-		writer.println("<tr><td>Homepage</td><td><a target='_blank' href='" 
-				+ app.homepage
-				+ "'>"
-				+ app.homepage
-				+ "</a></td></tr>");
+		writer.println("<tr><td>Homepage</td><td><a target='_blank' href='"
+				+ app.homepage + "'>" + app.homepage + "</a></td></tr>");
 		writer.println("<tr><td>Properties</td></tr>");
 		writer.println("<tr></tr>");
 
@@ -281,7 +278,7 @@ public class AmbariStoreServlet extends HttpServlet {
 		if (tasks.size() != 0) {
 			writer.println("<h3>Installation steps remaining.</h3> After restarting Ambari, click \"Finish Installations\" to complete the installation. The following applications need a restart or finalize:");
 			writer.println("<br><table class=table><tr>");
-//			writer.println("<br><table BORDER=1 CELLPADDING=3 CELLSPACING=1 RULES=COLS FRAME=VSIDES><tr>");
+			// writer.println("<br><table BORDER=1 CELLPADDING=3 CELLSPACING=1 RULES=COLS FRAME=VSIDES><tr>");
 			for (String uri : tasks) {
 				StoreApplication application = BackendStoreEndpoint
 						.netgetApplicationFromStoreByUri(uri);
@@ -291,6 +288,10 @@ public class AmbariStoreServlet extends HttpServlet {
 			writer.println("</tr></table>");
 		}
 
+		// TODO: unsafe. Indexed by instanceName
+		Map<String, StoreApplication> installedApplications = mainStoreApplication
+				.getInstalledApplications();
+
 		writer.println("<form name=\"input\" method=\"POST\">");
 
 		writer.println("<input type=\"submit\" value=\"Check for updates\" name=\"check_updates\"/>");
@@ -298,14 +299,13 @@ public class AmbariStoreServlet extends HttpServlet {
 		writer.println("<input type=\"submit\" value=\"Finish installations\" name=\"post_install\"/>");
 		writer.println("<p></p>");
 
-		
-		writer.println("<div class=\"panel panel-success\">\n" + 
-				"  <!-- Default panel contents -->\n" + 
-				"  <div class=\"panel-heading\">All Applications</div>\n" + 
-				"  <div class=\"panel-body\">\n" + 
-				"    <p> Please select the applications you want to install. </p>\n" + 
-				"  </div>");
-		
+		writer.println("<div class=\"panel panel-success\">\n"
+				+ "  <!-- Default panel contents -->\n"
+				+ "  <div class=\"panel-heading\">All Applications</div>\n"
+				+ "  <div class=\"panel-body\">\n"
+				+ "    <p> Please select the applications you want to install. </p>\n"
+				+ "  </div>");
+
 		writer.println("<table class=table>");
 		writer.println("<tr>");
 		writer.println("<th>Category</th>");
@@ -348,11 +348,15 @@ public class AmbariStoreServlet extends HttpServlet {
 			writer.println("</td>");
 
 			writer.println("<td>");
+			if (installedApplications.containsKey(app.getInstanceName())) {
+				writer.println(installedApplications.get(app.getInstanceName()).getVersion());
+			}
 
 			// TODO: very inefficient TODO TODO
-			if (mainStoreApplication.getInstalledVersion(app) != null) {
-				writer.println(mainStoreApplication.getInstalledVersion(app));
-			}
+			// if (mainStoreApplication.getInstalledVersion(app) != null) {
+			// writer.println(mainStoreApplication.getInstalledVersion(app));
+			// }
+
 			writer.println("</td>");
 
 			writer.println("<td align='center'>");
@@ -468,8 +472,6 @@ public class AmbariStoreServlet extends HttpServlet {
 		String output = mainStoreApplication.getAmbariViews().restartAmbari();
 		writer.println(output);
 	}
-
-
 
 	// We get called if endpointChecks == false
 	private void displayChecks(HttpServletRequest request,
@@ -592,27 +594,28 @@ public class AmbariStoreServlet extends HttpServlet {
 		// writer.println( "<script>location.reload(true)</script>");
 	}
 
-	
-	protected void bootstrapjs(HttpServletResponse response) throws IOException{
+	protected void bootstrapjs(HttpServletResponse response) throws IOException {
 		PrintWriter writer = response.getWriter();
-		writer.println("		<!-- Latest compiled and minified CSS -->\n" + 
-				"	<head>	<link rel=\"stylesheet\" href=\"https://maxcdn.bootstrapcdn.com/bootstrap/3.3.4/css/bootstrap.min.css\">\n" + 
-				"\n" + 
-				"		<!-- Optional theme -->\n" + 
-				"		<link rel=\"stylesheet\" href=\"https://maxcdn.bootstrapcdn.com/bootstrap/3.3.4/css/bootstrap-theme.min.css\">\n" + 
-				"\n" + 
-				"		<!-- Latest compiled and minified JavaScript -->\n" + 
-				"		<script src=\"https://maxcdn.bootstrapcdn.com/bootstrap/3.3.4/js/bootstrap.min.js\"></script>\n" + 
-				"</head>");
-		
-	}
-	
-	/*
-	protected void bootstrap(HttpServletResponse response) throws IOException {
-		PrintWriter writer = response.getWriter();
-		writer.println(" <link href=\"css/bootstrap.min.css\" rel=\"stylesheet\">");
+		writer.println("		<!-- Latest compiled and minified CSS -->\n"
+				+ "	<head>	<link rel=\"stylesheet\" href=\"https://maxcdn.bootstrapcdn.com/bootstrap/3.3.4/css/bootstrap.min.css\">\n"
+				+ "\n"
+				+ "		<!-- Optional theme -->\n"
+				+ "		<link rel=\"stylesheet\" href=\"https://maxcdn.bootstrapcdn.com/bootstrap/3.3.4/css/bootstrap-theme.min.css\">\n"
+				+ "\n"
+				+ "		<!-- Latest compiled and minified JavaScript -->\n"
+				+ "		<script src=\"https://maxcdn.bootstrapcdn.com/bootstrap/3.3.4/js/bootstrap.min.js\"></script>\n"
+				+ "</head>");
 
-		writer.println("<script src=\"https://ajax.googleapis.com/ajax/libs/jquery/1.11.2/jquery.min.js\"></script>");
-		writer.println("<script src=\"js/bootstrap.min.js\"></script>");
-	}*/
+	}
+
+	/*
+	 * protected void bootstrap(HttpServletResponse response) throws IOException
+	 * { PrintWriter writer = response.getWriter();
+	 * writer.println(" <link href=\"css/bootstrap.min.css\" rel=\"stylesheet\">"
+	 * );
+	 * 
+	 * writer.println(
+	 * "<script src=\"https://ajax.googleapis.com/ajax/libs/jquery/1.11.2/jquery.min.js\"></script>"
+	 * ); writer.println("<script src=\"js/bootstrap.min.js\"></script>"); }
+	 */
 }

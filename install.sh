@@ -13,7 +13,7 @@ USE_DEMO_SERVER=no
 read -d '' data << EOF
 [{ 
 "ViewInstanceInfo" : { "label" : "Ambari Store", "description" : "Ambari Application Store", 
-"properties" : {"amstore.ambari.cluster.url":"http://hdp2-master1.cloud.hortonworks.com:8080","amstore.ambari.cluster.password":"hortonworks","amstore.ambari.local.password":"admin","amstore.ambari.cluster.username":"admin","amstore.ambari.local.username":"admin","amstore.ambari.local.url":"http://localhost:8080" } } }]
+"properties" : {"amstore.ambari.cluster.url":"http://lake01.cloud.hortonworks.com:8080","amstore.ambari.cluster.password":"hortonworks","amstore.ambari.local.password":"admin","amstore.ambari.cluster.username":"remoteambari","amstore.ambari.local.username":"admin","amstore.ambari.local.url":"http://localhost:8080" } } }]
 EOF
 function create_instance2() {
 curl -u admin:admin -X POST -H "X-Requested-By: ambari" -d "${data}" http://localhost:8080/api/v1/views/AMBARI-STORE/versions/${VERSION}/instances/store     

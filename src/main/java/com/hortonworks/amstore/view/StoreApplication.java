@@ -18,6 +18,8 @@
 
 package com.hortonworks.amstore.view;
 
+import java.io.File;
+import java.io.IOException;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.List;
@@ -25,7 +27,8 @@ import java.util.ArrayList;
 import java.util.TreeMap;
 
 import org.apache.ambari.view.ViewContext;
-
+import org.apache.ambari.view.ViewInstanceDefinition;
+import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.FilenameUtils;
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -37,10 +40,6 @@ public class StoreApplication {
 	protected String id;
 	protected String app_id;
 	protected String category;
-
-	public String getId() {
-		return id;
-	}
 
 	protected String label; // obsolete. label is View Name
 	protected String description;
@@ -56,6 +55,8 @@ public class StoreApplication {
 	protected String viewName;
 	protected String version;
 
+	protected String contributor;
+
 	// name of the instance managed by the Store
 	// public String viewVersion;
 	protected String instanceName;
@@ -64,33 +65,16 @@ public class StoreApplication {
 	protected String package_uri;
 	protected List<String> tags = new ArrayList<String>();
 
-	protected String contributor;
-	public String getContributor() {
-		return contributor;
-	}
-
-	public void setContributor(String contributor) {
-		this.contributor = contributor;
-	}
-
-	public String getPackager() {
-		return packager;
-	}
-
-	public void setPackager(String packager) {
-		this.packager = packager;
-	}
-
-	protected String packager;
-	
-	
-	// The viewContext
-	protected ViewContext viewContext;
-
+	/*
 	public StoreApplication(ViewContext viewContext) {
 		this.viewContext = viewContext;
+	}*/
+	public StoreApplication(ViewContext viewContext, String appId) {		
+		this.viewContext = viewContext;
+		
 	}
-
+	
+	
 	public StoreApplication(ViewContext viewContext, String viewName,
 			String version, String instanceName, String instanceDisplayName,
 			String description) {
@@ -100,6 +84,15 @@ public class StoreApplication {
 		this.instanceName = instanceName;
 		this.instanceDisplayName = instanceDisplayName;
 		this.description = description;
+	}
+	
+	public StoreApplication(ViewContext viewContext, ViewInstanceDefinition viewInstanceDefinition) {
+		this.viewContext = viewContext;
+		this.viewName = viewInstanceDefinition.getViewName();
+		this.version = viewInstanceDefinition.getViewDefinition().getVersion();
+		this.instanceName = viewInstanceDefinition.getInstanceName();
+		this.instanceDisplayName = viewInstanceDefinition.getLabel();
+		this.description = viewInstanceDefinition.getDescription();
 	}
 
 	public StoreApplication(JSONObject app) {
@@ -136,17 +129,47 @@ public class StoreApplication {
 
 	}
 
+
+	public String getId() {
+		return id;
+	}
+
+	
+
+	public String getContributor() {
+		return contributor;
+	}
+
+	public void setContributor(String contributor) {
+		this.contributor = contributor;
+	}
+
+	public String getPackager() {
+		return packager;
+	}
+
+	public void setPackager(String packager) {
+		this.packager = packager;
+	}
+
+	protected String packager;
+	
+	
+	// The viewContext
+	protected ViewContext viewContext;
+
+
 	// Properties from backend Store
-	Map<String, String> getBackendProperties() {
+	public Map<String, String> getBackendProperties() {
 		return properties;
 	}
 
-	Map<String, String> getDesiredInstanceProperties() {
+	public Map<String, String> getDesiredInstanceProperties() {
 		return desiredInstanceProperties;
 	}
 
 	// Properties from managed Instance
-	void setDesiredInstanceProperties(Map<String, String> props) {
+	public void setDesiredInstanceProperties(Map<String, String> props) {
 		desiredInstanceProperties = props;
 	}
 
@@ -273,4 +296,21 @@ public class StoreApplication {
 		return viewContext;
 	}
 
+	
+	public String deleteApplicationFiles(){
+		String response = "";
+		String workDirectory = getPackageWorkdir();
+		String packagePath = getPackageFilepath();
+		try {
+			response += "Deleting " + packagePath + " and " + workDirectory
+					+ ".<br>";
+			FileUtils.deleteDirectory(new File(workDirectory));
+			FileUtils.forceDelete(new File(packagePath));
+
+		} catch (IOException e) {
+			response += "Something went wrong deleting " + workDirectory
+					+ " or " + packagePath + "<br>";
+		}
+		return response;
+	}
 }
