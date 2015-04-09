@@ -2,11 +2,13 @@ package com.hortonworks.amstore.view;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.URLEncoder;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import java.util.TreeMap;
 import java.util.Map.Entry;
 
@@ -27,10 +29,23 @@ public class MainStoreApplication extends StoreApplication {
 	protected BackendStoreEndpoint storeEndpoint = null;
 
 	public MainStoreApplication(ViewContext viewContext) {
-		// TODO: remove hard coded values and pick up from configuration !
-		super(viewContext, "AMBARI-STORE", "0.1.1", "store", "Ambari Store",
-				"Ambari Application Store");
+		super(viewContext);
 
+		// TODO: Probably should be using Setters rather than direct variables.
+		try {
+			Properties properties = new Properties();
+			InputStream stream = getClass().getClassLoader()
+					.getResourceAsStream("store.properties");
+			properties.load(stream);
+
+			viewName = properties.getProperty("viewName");
+			version = properties.getProperty("version");
+			instanceName = properties.getProperty("instanceName");
+			instanceDisplayName = properties.getProperty("instanceDisplayName");
+			description = properties.getProperty("description");
+
+		} catch (java.io.IOException e) {
+		}
 		initAmbariEndpoints();
 	}
 
@@ -314,16 +329,29 @@ public class MainStoreApplication extends StoreApplication {
 
 		Map<String, StoreApplication> availableApplications = getStoreEndpoint()
 				.getAllApplicationsFromStore();
-		StoreApplication newApplication = availableApplications.get(app_id);
-		// Download the new package
-		newApplication.downloadPackageFile();
+		StoreApplication newApplication = availableApplications.get(appId);
 
 		// Get the installed version
 		StoreApplication installedApplication = this
 				.getInstalledApplicationByAppId(appId);
 
+		if (installedApplication == null) {
+			response += "No installed application found.";
+			return response;
+		}
+
+		if (newApplication.getVersion().equals(
+				installedApplication.getVersion())) {
+			response += "Can't update to same version. Use force installation instead.<br>";
+			return response;
+		}
+
 		// Delete old package but not work directory
+		// This is important: the old instance must survive a restart
 		installedApplication.deletePackageFile();
+
+		// Download the new package
+		newApplication.downloadPackageFile();
 
 		// Line up post update tasks after restart
 		addPostUpdateTask(newApplication.uri);
@@ -334,13 +362,13 @@ public class MainStoreApplication extends StoreApplication {
 
 	// TODO: Move into mainStoreApplication when feedback can be provided
 	// dynamically
-	public String installApplication(String app_id) {
+	public String installApplication(String appId) {
 
 		String response = "Starting downloads.<br>";
 
 		Map<String, StoreApplication> availableApplications = getStoreEndpoint()
 				.getAllApplicationsFromStore();
-		StoreApplication app = availableApplications.get(app_id);
+		StoreApplication app = availableApplications.get(appId);
 		app.downloadPackageFile();
 		addPostInstallTask(app.uri);
 
@@ -784,8 +812,6 @@ public class MainStoreApplication extends StoreApplication {
 		return tasklist;
 	}
 
-	// Make sure to call isValidPostInstallTasks() first and only call this if
-	// successful
 	public String doPostUpdateTasks() throws IOException {
 
 		String response = " DO POST UPDATE TASKS <br>";
@@ -802,6 +828,8 @@ public class MainStoreApplication extends StoreApplication {
 
 				if (newApplication == null) {
 					response += "ERROR: application is NULL !";
+					// Remove it from the list
+					response += removePostUpdateTask(uri);
 					continue;
 				}
 
@@ -815,6 +843,14 @@ public class MainStoreApplication extends StoreApplication {
 				response += newApplication.instanceDisplayName + "<br>";
 				response += newApplication.description + "<br>";
 				response += newApplication.properties.size() + "<br>";
+
+				// If its the same version, error and do nothing
+				if (newApplication.getVersion().equals(
+						installedApplication.getVersion()))
+					throw new IllegalArgumentException(
+							"Cannot update to the same version:"
+									+ installedApplication
+											.getInstanceDisplayName());
 
 				/*
 				 * Check whether we can install. If the package has not yet been

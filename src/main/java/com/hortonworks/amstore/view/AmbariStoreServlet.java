@@ -168,6 +168,8 @@ public class AmbariStoreServlet extends HttpServlet {
 				action = "check_updates";
 			else if (request.getParameter("post_install") != null)
 				action = "post_install";
+			else if (request.getParameter("home") != null)
+				action = "home";
 
 			// Second form
 			if (action.equals("reconfigurepage")) {
@@ -179,20 +181,29 @@ public class AmbariStoreServlet extends HttpServlet {
 
 			} else if (action.equals("restart_ambari")) {
 				restartAmbari(response);
+			} else if (action.equals("home")) {
+				redirectHome(response);
 			} else if (action.equals("check_updates")) {
 				// Reload applications from back and refresh to GET
 				mainStoreApplication.getStoreEndpoint().refresh();
 				displayAllApplications(request, response);
 
 			} else if (action.equals("post_install")) {
-				mainStoreApplication.doPostUpdateTasks();
+				if (mainStoreApplication.getPostUpdateTasks().size()
+						+ mainStoreApplication.getPostInstallTasks().size() == 0)
+					redirectHome(response);
+
 				try {
+					mainStoreApplication.doPostUpdateTasks();
 					mainStoreApplication.doPostInstallTasks();
-					writer.println("Complete. Please refresh your browser.");
-				} catch (GenericException e) { // TODO: issue a warning if not all installations completed.
+					writer.println("Please refresh your browser.");
+				} catch (GenericException e) { // TODO: issue a warning if not
+												// all installations completed.
 					writer.println("Could not proceed. Make sure you have restarted Ambari");
-					// redirectHome(response);
 				}
+				if (mainStoreApplication.getPostUpdateTasks().size()
+						+ mainStoreApplication.getPostInstallTasks().size() != 0)
+					writer.println("Not all tasks completed. Make sure you have restarted Ambari");
 
 			} else { // First form
 				String[] checked = null;
@@ -202,20 +213,15 @@ public class AmbariStoreServlet extends HttpServlet {
 
 					if (action.equals("install")) {
 						doInstallation(checked);
-						redirectHome(response);
 					} else if (action.equals("update")) {
 						doUpdate(checked);
-						redirectHome(response);
 					} else if (action.equals("delete")) {
 						doDelete(checked);
-						redirectHome(response);
 					} else if (action.equals("uninstall")) {
 						doUninstall(checked);
-						redirectHome(response);
 					}
-
 				}
-
+				redirectHome(response);
 			}
 
 		} catch (NullPointerException e) {
@@ -453,6 +459,10 @@ public class AmbariStoreServlet extends HttpServlet {
 
 		writer.println("<tr><td colspan=2 align=center>");
 		writer.println("<input disabled type=\"submit\" value=\"Apply to all Installed Applications\" name=\"reconfigureapps\">");
+		writer.println("</td></tr>");
+
+		writer.println("<tr><td colspan=2 align=center>");
+		writer.println("<input type=\"submit\" value=\"Return home\" name=\"home\">");
 		writer.println("</td></tr>");
 
 		writer.println("</table>");

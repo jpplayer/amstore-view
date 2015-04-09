@@ -128,6 +128,7 @@
         <filtering>false</filtering>
         <includes>
             <include>view.xml</include>
+            <include>store.properties</include>
             <include>WEB-INF/web.xml</include>
         </includes>
         </resource>

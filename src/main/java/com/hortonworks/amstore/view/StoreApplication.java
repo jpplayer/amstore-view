@@ -42,7 +42,6 @@ public class StoreApplication {
 	protected String category;
 
 	protected String label; // obsolete. label is View Name
-	protected String description;
 	protected String readiness;
 	protected String homepage;
 	protected String uri;
@@ -54,25 +53,31 @@ public class StoreApplication {
 	// Settings from view.xml
 	protected String viewName;
 	protected String version;
+	protected String instanceName;
+	protected String instanceDisplayName;
+	protected String description;
 
 	protected String contributor;
 
 	// name of the instance managed by the Store
 	// public String viewVersion;
-	protected String instanceName;
-	protected String instanceDisplayName;
 
 	protected String package_uri;
 	protected List<String> tags = new ArrayList<String>();
 
+	// Should only ever be called by inheriting classes, which should
+	// set the main values (viewName, version, etc)
+	protected StoreApplication(ViewContext viewContext) {
+		this.viewContext = viewContext;
+	}
+	
 	/*
 	 * public StoreApplication(ViewContext viewContext) { this.viewContext =
 	 * viewContext; }
 	 */
-	public StoreApplication(ViewContext viewContext, String appId) {
-		this.viewContext = viewContext;
-
-	}
+//	public StoreApplication(ViewContext viewContext, String appId) {
+//		this.viewContext = viewContext;
+//	}
 
 	public StoreApplication(ViewContext viewContext, String viewName,
 			String version, String instanceName, String instanceDisplayName,

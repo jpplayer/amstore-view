@@ -7,7 +7,7 @@ CLUSTER_NAME=""
 CURL='curl'
 CREDENTIALS="admin:admin" 
 agent="store-installer"
-VERSION="0.1.1"
+VERSION="0.1.2"
 USE_DEMO_SERVER=no
 
 read -d '' data << EOF
