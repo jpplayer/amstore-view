@@ -29,10 +29,12 @@ import javax.servlet.http.HttpServletResponse;
 
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Set;
 import java.util.TreeMap;
 
 import static org.apache.commons.lang.StringEscapeUtils.escapeHtml;
@@ -133,7 +135,7 @@ public class AmbariStoreServlet extends HttpServlet {
 		bootstrapjs(response);
 
 		PrintWriter writer = response.getWriter();
-
+		writer.println("<h2>Ambari Store</h2>");
 		try {
 
 			if (endpointIssues) {
@@ -278,26 +280,14 @@ public class AmbariStoreServlet extends HttpServlet {
 		List<String> updateTasks = mainStoreApplication.getPostUpdateTasks();
 		List<String> installTasks = mainStoreApplication.getPostInstallTasks();
 
+		Set<String> allTasks = new HashSet<String>(updateTasks);
+		allTasks.addAll(installTasks);
 
-		if (updateTasks.size() != 0) {
+		if (allTasks.size() != 0) {
+
 			writer.println("<h3>Update steps remaining.</h3> After restarting Ambari, click \"Finish Installations\" to complete the installation. The following applications need a restart or finalize:");
 			writer.println("<br><table class=table><tr>");
-			// writer.println("<br><table BORDER=1 CELLPADDING=3 CELLSPACING=1 RULES=COLS FRAME=VSIDES><tr>");
-			for (String uri : updateTasks) {
-				StoreApplication application = BackendStoreEndpoint
-						.netgetApplicationFromStoreByUri(uri);
-				writer.println("<td>" + application.instanceDisplayName
-						+ "</td>");
-			}
-			writer.println("</tr></table>");
-		}
-
-		
-		if (installTasks.size() != 0) {
-			writer.println("<h3>Installation steps remaining.</h3> After restarting Ambari, click \"Finish Installations\" to complete the installation. The following applications need a restart or finalize:");
-			writer.println("<br><table class=table><tr>");
-			// writer.println("<br><table BORDER=1 CELLPADDING=3 CELLSPACING=1 RULES=COLS FRAME=VSIDES><tr>");
-			for (String uri : installTasks) {
+			for (String uri : allTasks) {
 				StoreApplication application = BackendStoreEndpoint
 						.netgetApplicationFromStoreByUri(uri);
 				writer.println("<td>" + application.instanceDisplayName
@@ -368,27 +358,23 @@ public class AmbariStoreServlet extends HttpServlet {
 
 			writer.println("<td>");
 			if (installedApplications.containsKey(app.getInstanceName())) {
-				writer.println(installedApplications.get(app.getInstanceName()).getVersion());
+				writer.println(installedApplications.get(app.getInstanceName())
+						.getVersion());
 			}
 			writer.println("</td>");
 
 			// update
 			writer.println("<td>");
-			if (
-					installedApplications.containsKey(app.getInstanceName())
-					&& 
-					!			
-					installedApplications.get(app.getInstanceName()).getVersion()
-					.equals(  app.getVersion() )
-					) {
+			if (installedApplications.containsKey(app.getInstanceName())
+					&& !installedApplications.get(app.getInstanceName())
+							.getVersion().equals(app.getVersion())) {
 				writer.println("update");
 			}
 			writer.println("</td>");
-			
-			
+
 			writer.println("<td align='center'>");
 			writer.println("<input type='checkbox' name='checked' value='"
-						+ app.app_id + "'>");
+					+ app.app_id + "'>");
 			writer.println("</td>");
 			writer.println("</tr>");
 		}
@@ -577,7 +563,11 @@ public class AmbariStoreServlet extends HttpServlet {
 		// doDelete( app_ids);
 
 		for (String app_id : app_ids) {
-			response += mainStoreApplication.uninstallApplication(app_id);
+			try {
+				response += mainStoreApplication.uninstallApplication(app_id);
+			} catch (IOException e) {// TODO: we ignore any issues
+
+			}
 		}
 
 		debugWriter.println("Respnse:" + response + "<br>");
@@ -590,9 +580,13 @@ public class AmbariStoreServlet extends HttpServlet {
 		String response = "";
 
 		for (String app_id : app_ids) {
+			try {
+				response += mainStoreApplication.updateApplication(app_id);
+			} catch (IOException e) {// TODO: we ignore any issues
 
-			response += mainStoreApplication.updateApplication(app_id);
+			}
 		}
+
 		debugWriter.println("Respnse:" + response + "<br>");
 	}
 

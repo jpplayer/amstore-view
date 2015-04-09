@@ -256,7 +256,7 @@ public class MainStoreApplication extends StoreApplication {
 	 * Removes the associated files of an instance. Requires a restart to
 	 * complete. Assert: the view must be instantiated
 	 */
-	public String uninstallApplication(String appId) {
+	public String uninstallApplication(String appId) throws IOException {
 		String response = "";
 
 		// Get the latest version
@@ -296,7 +296,7 @@ public class MainStoreApplication extends StoreApplication {
 			return response;
 		}
 
-		response += installedApplication.deleteApplicationFiles();
+		installedApplication.deleteApplicationFiles();
 
 		// We don't need the viewInstance anymore so we delete it now
 		response += deleteApplication(appId);
@@ -309,7 +309,7 @@ public class MainStoreApplication extends StoreApplication {
 		return response;
 	}
 
-	public String updateApplication(String appId) {
+	public String updateApplication(String appId) throws IOException {
 		String response = "";
 
 		// Get the installed version
@@ -319,6 +319,9 @@ public class MainStoreApplication extends StoreApplication {
 		// This installs the new view
 		response += installApplication(appId);
 
+		// Delete old package but nor work directory
+		installedApplication.deletePackageFile();
+		
 		// Make sure we remove old instances first
 		addPostUpdateTask(installedApplication.uri);
 
@@ -824,7 +827,7 @@ public class MainStoreApplication extends StoreApplication {
 				response += deleteApplication(application.getApp_id());
 
 				// delete any remaining files
-				response += application.deleteApplicationFiles();
+				application.deleteApplicationFiles();
 
 				// If all goes well, remove task from list.
 				response += "Removing update task from list.<br>";

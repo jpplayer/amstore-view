@@ -301,20 +301,24 @@ public class StoreApplication {
 	}
 
 	
-	public String deleteApplicationFiles(){
-		String response = "";
-		String workDirectory = getPackageWorkdir();
+	public void deletePackageFile() throws IOException {
 		String packagePath = getPackageFilepath();
-		try {
-			response += "Deleting " + packagePath + " and " + workDirectory
-					+ ".<br>";
-			FileUtils.deleteDirectory(new File(workDirectory));
 			FileUtils.forceDelete(new File(packagePath));
+	}
 
-		} catch (IOException e) {
-			response += "Something went wrong deleting " + workDirectory
-					+ " or " + packagePath + "<br>";
+	public void deleteWorkDirectory() throws IOException {
+		String workDirectory = getPackageWorkdir();
+		FileUtils.deleteDirectory(new File(workDirectory));
+	}
+
+	
+	public void deleteApplicationFiles() {
+		try {
+			deletePackageFile();
+			deleteWorkDirectory();
+		} catch (IOException e){
+			// Issue a warning TODO
+//			throw new WarningException("Not all files removed successfully");
 		}
-		return response;
 	}
 }
