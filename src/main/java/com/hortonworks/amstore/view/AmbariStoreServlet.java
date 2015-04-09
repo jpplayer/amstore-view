@@ -275,12 +275,29 @@ public class AmbariStoreServlet extends HttpServlet {
 
 		PrintWriter writer = response.getWriter();
 		// Post Install Tasks
-		List<String> tasks = mainStoreApplication.getPostInstallTasks();
-		if (tasks.size() != 0) {
+		List<String> updateTasks = mainStoreApplication.getPostUpdateTasks();
+		List<String> installTasks = mainStoreApplication.getPostInstallTasks();
+
+
+		if (updateTasks.size() != 0) {
+			writer.println("<h3>Update steps remaining.</h3> After restarting Ambari, click \"Finish Installations\" to complete the installation. The following applications need a restart or finalize:");
+			writer.println("<br><table class=table><tr>");
+			// writer.println("<br><table BORDER=1 CELLPADDING=3 CELLSPACING=1 RULES=COLS FRAME=VSIDES><tr>");
+			for (String uri : updateTasks) {
+				StoreApplication application = BackendStoreEndpoint
+						.netgetApplicationFromStoreByUri(uri);
+				writer.println("<td>" + application.instanceDisplayName
+						+ "</td>");
+			}
+			writer.println("</tr></table>");
+		}
+
+		
+		if (installTasks.size() != 0) {
 			writer.println("<h3>Installation steps remaining.</h3> After restarting Ambari, click \"Finish Installations\" to complete the installation. The following applications need a restart or finalize:");
 			writer.println("<br><table class=table><tr>");
 			// writer.println("<br><table BORDER=1 CELLPADDING=3 CELLSPACING=1 RULES=COLS FRAME=VSIDES><tr>");
-			for (String uri : tasks) {
+			for (String uri : installTasks) {
 				StoreApplication application = BackendStoreEndpoint
 						.netgetApplicationFromStoreByUri(uri);
 				writer.println("<td>" + application.instanceDisplayName
@@ -315,6 +332,7 @@ public class AmbariStoreServlet extends HttpServlet {
 		writer.println("<th>Description</th>");
 		writer.println("<th>Readiness</th>");
 		writer.println("<th>Installed</th>");
+		writer.println("<th></th>");
 		writer.println("<th>Select</th>");
 		writer.println("</tr>");
 
@@ -354,6 +372,20 @@ public class AmbariStoreServlet extends HttpServlet {
 			}
 			writer.println("</td>");
 
+			// update
+			writer.println("<td>");
+			if (
+					installedApplications.containsKey(app.getInstanceName())
+					&& 
+					!			
+					installedApplications.get(app.getInstanceName()).getVersion()
+					.equals(  app.getVersion() )
+					) {
+				writer.println("update");
+			}
+			writer.println("</td>");
+			
+			
 			writer.println("<td align='center'>");
 			writer.println("<input type='checkbox' name='checked' value='"
 						+ app.app_id + "'>");

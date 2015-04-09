@@ -28,7 +28,7 @@ public class MainStoreApplication extends StoreApplication {
 
 	public MainStoreApplication(ViewContext viewContext) {
 		// TODO: remove hard coded values and pick up from configuration !
-		super(viewContext, "AMBARI-STORE", "0.1.0", "store", "Ambari Store",
+		super(viewContext, "AMBARI-STORE", "0.1.1", "store", "Ambari Store",
 				"Ambari Application Store");
 
 		initAmbariEndpoints();
@@ -315,9 +315,6 @@ public class MainStoreApplication extends StoreApplication {
 		// Get the installed version
 		StoreApplication installedApplication = this
 				.getInstalledApplicationByAppId(appId);
-
-		// This removes files but keeps the instance
-		response += installedApplication.deleteApplicationFiles();
 
 		// This installs the new view
 		response += installApplication(appId);
@@ -822,8 +819,12 @@ public class MainStoreApplication extends StoreApplication {
 				response += application.description + "<br>";
 				response += application.properties.size() + "<br>";
 
+				
 				// delete any old instance
-				deleteApplication(application.getApp_id());
+				response += deleteApplication(application.getApp_id());
+
+				// delete any remaining files
+				response += application.deleteApplicationFiles();
 
 				// If all goes well, remove task from list.
 				response += "Removing update task from list.<br>";
