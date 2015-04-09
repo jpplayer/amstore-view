@@ -186,9 +186,14 @@ public class AmbariStoreServlet extends HttpServlet {
 
 			} else if (action.equals("post_install")) {
 				mainStoreApplication.doPostUpdateTasks();
-				mainStoreApplication.doPostInstallTasks();
-				writer.println("Complete. Please refresh your browser.");
-				// redirectHome(response);
+				try {
+					mainStoreApplication.doPostInstallTasks();
+					writer.println("Complete. Please refresh your browser.");
+				} catch (GenericException e) { // TODO: issue a warning if not all installations completed.
+					writer.println("Could not proceed. Make sure you have restarted Ambari");
+					// redirectHome(response);
+				}
+
 			} else { // First form
 				String[] checked = null;
 				if (request.getParameter("checked") != null) {

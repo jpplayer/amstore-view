@@ -66,15 +66,14 @@ public class StoreApplication {
 	protected List<String> tags = new ArrayList<String>();
 
 	/*
-	public StoreApplication(ViewContext viewContext) {
+	 * public StoreApplication(ViewContext viewContext) { this.viewContext =
+	 * viewContext; }
+	 */
+	public StoreApplication(ViewContext viewContext, String appId) {
 		this.viewContext = viewContext;
-	}*/
-	public StoreApplication(ViewContext viewContext, String appId) {		
-		this.viewContext = viewContext;
-		
+
 	}
-	
-	
+
 	public StoreApplication(ViewContext viewContext, String viewName,
 			String version, String instanceName, String instanceDisplayName,
 			String description) {
@@ -85,8 +84,9 @@ public class StoreApplication {
 		this.instanceDisplayName = instanceDisplayName;
 		this.description = description;
 	}
-	
-	public StoreApplication(ViewContext viewContext, ViewInstanceDefinition viewInstanceDefinition) {
+
+	public StoreApplication(ViewContext viewContext,
+			ViewInstanceDefinition viewInstanceDefinition) {
 		this.viewContext = viewContext;
 		this.viewName = viewInstanceDefinition.getViewName();
 		this.version = viewInstanceDefinition.getViewDefinition().getVersion();
@@ -112,7 +112,7 @@ public class StoreApplication {
 
 		contributor = _s(app, "contributor");
 		packager = _s(app, "packager");
-		
+
 		JSONArray atags = _a(app, "tags");
 		for (int j = 0; j < atags.length(); j++) {
 			tags.add(atags.getString(j));
@@ -130,15 +130,13 @@ public class StoreApplication {
 	}
 
 	// Returns true if this application represents the Ambari Store itself
-	public boolean isStore(){
+	public boolean isStore() {
 		return app_id.equals("ambari-store");
 	}
 
 	public String getId() {
 		return id;
 	}
-
-	
 
 	public String getContributor() {
 		return contributor;
@@ -157,11 +155,9 @@ public class StoreApplication {
 	}
 
 	protected String packager;
-	
-	
+
 	// The viewContext
 	protected ViewContext viewContext;
-
 
 	// Properties from backend Store
 	public Map<String, String> getBackendProperties() {
@@ -224,15 +220,15 @@ public class StoreApplication {
 			String filename = FilenameUtils.getName(package_uri);
 			// Remove any leftover uri characters
 			filename = filename.split("\\?")[0];
-//					substring(0, filename.indexOf('?'));
-			
+			// substring(0, filename.indexOf('?'));
+
 			return targetPath + "/" + filename;
 		} else
 			return null;
 	}
 
 	public String getViewName() {
-		if ( viewName == null)
+		if (viewName == null)
 			throw new RuntimeException("Call to viewname returning null");
 		return viewName;
 	}
@@ -300,10 +296,9 @@ public class StoreApplication {
 		return viewContext;
 	}
 
-	
 	public void deletePackageFile() throws IOException {
 		String packagePath = getPackageFilepath();
-			FileUtils.forceDelete(new File(packagePath));
+		FileUtils.forceDelete(new File(packagePath));
 	}
 
 	public void deleteWorkDirectory() throws IOException {
@@ -311,14 +306,30 @@ public class StoreApplication {
 		FileUtils.deleteDirectory(new File(workDirectory));
 	}
 
-	
 	public void deleteApplicationFiles() {
 		try {
 			deletePackageFile();
 			deleteWorkDirectory();
-		} catch (IOException e){
+		} catch (IOException e) {
 			// Issue a warning TODO
-//			throw new WarningException("Not all files removed successfully");
+			// throw new WarningException("Not all files removed successfully");
 		}
 	}
+
+	public void downloadPackageFile() {
+
+		if (getPackage_uri() != null) {
+			// Check whether the file is already present (do not
+			// re-download)
+			String targetPath = getPackageFilepath();
+			File file = new File(targetPath);
+
+			if (!file.isFile()) {
+				// How can we do this in a thread and provide download
+				// update ? TODO
+				AmbariStoreHelper.downloadFile(getPackage_uri(), targetPath);
+			}
+		}
+	}
+
 }

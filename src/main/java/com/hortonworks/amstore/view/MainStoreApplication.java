@@ -310,20 +310,23 @@ public class MainStoreApplication extends StoreApplication {
 	}
 
 	public String updateApplication(String appId) throws IOException {
-		String response = "";
+		String response = "Starting downloads for updates.<br>";
+
+		Map<String, StoreApplication> availableApplications = getStoreEndpoint()
+				.getAllApplicationsFromStore();
+		StoreApplication newApplication = availableApplications.get(app_id);
+		// Download the new package
+		newApplication.downloadPackageFile();
 
 		// Get the installed version
 		StoreApplication installedApplication = this
 				.getInstalledApplicationByAppId(appId);
 
-		// This installs the new view
-		response += installApplication(appId);
-
-		// Delete old package but nor work directory
+		// Delete old package but not work directory
 		installedApplication.deletePackageFile();
-		
-		// Make sure we remove old instances first
-		addPostUpdateTask(installedApplication.uri);
+
+		// Line up post update tasks after restart
+		addPostUpdateTask(newApplication.uri);
 
 		return response;
 
@@ -337,26 +340,10 @@ public class MainStoreApplication extends StoreApplication {
 
 		Map<String, StoreApplication> availableApplications = getStoreEndpoint()
 				.getAllApplicationsFromStore();
-
 		StoreApplication app = availableApplications.get(app_id);
-		// Verify that there is a package to download
-		if (app.package_uri != null) {
-			// Check whether the file is already present (do not
-			// re-download)
-			String targetPath = app.getPackageFilepath();
-			File file = new File(targetPath);
+		app.downloadPackageFile();
+		addPostInstallTask(app.uri);
 
-			if (!file.isFile()) {
-				response += "Downloading " + app.package_uri + " to "
-						+ targetPath + "<br>";
-				// How can we do this in a thread and provide download
-				// update ? TODO
-				AmbariStoreHelper.downloadFile(app.package_uri, targetPath);
-			} else {
-				response += "File already available. Not downloading.<br>";
-			}
-			addPostInstallTask(app.uri);
-		}
 		return response;
 	}
 
@@ -797,7 +784,9 @@ public class MainStoreApplication extends StoreApplication {
 		return tasklist;
 	}
 
-	public String doPostUpdateTasks() {
+	// Make sure to call isValidPostInstallTasks() first and only call this if
+	// successful
+	public String doPostUpdateTasks() throws IOException {
 
 		String response = " DO POST UPDATE TASKS <br>";
 
@@ -808,38 +797,73 @@ public class MainStoreApplication extends StoreApplication {
 
 			try {
 
-				StoreApplication application = BackendStoreEndpoint
+				StoreApplication newApplication = BackendStoreEndpoint
 						.netgetApplicationFromStoreByUri(uri);
 
-				if (application == null) {
+				if (newApplication == null) {
 					response += "ERROR: application is NULL !";
 					continue;
 				}
 
-				response += "<br>Received from the backend:" + application.id
-						+ "<br>";
-				response += application.instanceDisplayName + "<br>";
-				response += application.description + "<br>";
-				response += application.properties.size() + "<br>";
+				// Get the installed version
+				StoreApplication installedApplication = this
+						.getInstalledApplicationByAppId(newApplication
+								.getApp_id());
 
-				
-				// delete any old instance
-				response += deleteApplication(application.getApp_id());
+				response += "<br>Received from the backend:"
+						+ newApplication.id + "<br>";
+				response += newApplication.instanceDisplayName + "<br>";
+				response += newApplication.description + "<br>";
+				response += newApplication.properties.size() + "<br>";
 
-				// delete any remaining files
-				application.deleteApplicationFiles();
+				/*
+				 * Check whether we can install. If the package has not yet been
+				 * expanded we must wait for Ambari restart.
+				 */
+				File workdir = new File(newApplication.getPackageWorkdir());
+				if (!workdir.isDirectory()) {
+					response += "The application has not yet been unpacked. Requires restart.<br>";
+				} else {
 
-				// If all goes well, remove task from list.
-				response += "Removing update task from list.<br>";
-				response += removePostUpdateTask(uri);
-				response += "COMPLETED REMOVE POST INSTALL TASKS<br>";
+					// instantiate the new view
+					response += "STARTING POST UPDATE TASK FOR : "
+							+ newApplication.getPackageWorkdir() + "<br>";
+
+					// Map to current properties
+					// Exception: main store view would carry over old settings.
+					if (newApplication.isStore()) {
+						newApplication
+								.setDesiredInstanceProperties(installedApplication
+										.getProperties());
+					} else {
+						newApplication
+								.setDesiredInstanceProperties(getMappedProperties(newApplication));
+					}
+
+					response += "creating view: " + newApplication.instanceName
+							+ "<br>";
+					response += getAmbariViews().createViewInstance(
+							viewContext, newApplication);
+
+					// delete any remaining files
+					installedApplication.deleteApplicationFiles();
+
+					// delete any old instance
+					// Exception: if we are updating the main store, could lead
+					// to odd behavior
+					response += deleteApplication(installedApplication
+							.getApp_id());
+
+					// If all goes well, remove task from list.
+					response += "Removing update task from list.<br>";
+					response += removePostUpdateTask(uri);
+					response += "COMPLETED REMOVE POST INSTALL TASKS<br>";
+				}
 			} catch (ServiceFormattedException e) {
 				response += "An EXCEPION OCCURED<br>";
 				response += e.toString();
-			} 
+			}
 		}
-
 		return response;
 	}
-
 }
