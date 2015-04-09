@@ -183,6 +183,7 @@ public class AmbariStoreServlet extends HttpServlet {
 				displayAllApplications(request, response);
 
 			} else if (action.equals("post_install")) {
+				mainStoreApplication.doPostUpdateTasks();
 				mainStoreApplication.doPostInstallTasks();
 				writer.println("Complete. Please refresh your browser.");
 				// redirectHome(response);
@@ -351,20 +352,11 @@ public class AmbariStoreServlet extends HttpServlet {
 			if (installedApplications.containsKey(app.getInstanceName())) {
 				writer.println(installedApplications.get(app.getInstanceName()).getVersion());
 			}
-
-			// TODO: very inefficient TODO TODO
-			// if (mainStoreApplication.getInstalledVersion(app) != null) {
-			// writer.println(mainStoreApplication.getInstalledVersion(app));
-			// }
-
 			writer.println("</td>");
 
 			writer.println("<td align='center'>");
-			// TODO: bad logic. Should be encapsulated in the store type.
-			if (!app.app_id.equals("ambari-store")) {
-				writer.println("<input type='checkbox' name='checked' value='"
+			writer.println("<input type='checkbox' name='checked' value='"
 						+ app.app_id + "'>");
-			}
 			writer.println("</td>");
 			writer.println("</tr>");
 		}
@@ -553,7 +545,7 @@ public class AmbariStoreServlet extends HttpServlet {
 		// doDelete( app_ids);
 
 		for (String app_id : app_ids) {
-			response += mainStoreApplication.eraseApplication(app_id);
+			response += mainStoreApplication.uninstallApplication(app_id);
 		}
 
 		debugWriter.println("Respnse:" + response + "<br>");

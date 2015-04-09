@@ -129,6 +129,10 @@ public class StoreApplication {
 
 	}
 
+	// Returns true if this application represents the Ambari Store itself
+	public boolean isStore(){
+		return app_id.equals("ambari-store");
+	}
 
 	public String getId() {
 		return id;

@@ -195,4 +195,113 @@ public class TaskManagerService {
 		return Response.ok(response).type("text/html").build();
 	}
 
+	// ============= UPDATES
+	
+	
+	/**
+	 * Handles: POST /taskmanager/postupdatetasks Add a task to the list of
+	 * tasks This is done because of BUG: a call to viewContext.putInstanceData
+	 * inside the servlet returns ERROR 500 after a while.
+	 * 
+	 * @param headers
+	 *            http headers
+	 * @param ui
+	 *            uri info
+	 *
+	 * @return the response
+	 */
+	@POST
+	@Path("/postupdatetasks")
+	@Produces({ "text/html" })
+	public Response addPostUpdateTasks(String body,
+			@Context HttpHeaders headers, @Context UriInfo ui)
+			throws IOException {
+
+		String current = viewContext.getInstanceData("post-update-tasks");
+		if (current == null)
+			current = "[]";
+
+		JSONArray array = (JSONArray) JSONValue.parse(current);
+		array.add(body);
+
+		viewContext.putInstanceData("post-update-tasks", array.toString());
+
+		String output = "Added task:" + body;
+		return Response.ok(output).type("text/html").build();
+	}
+
+	/**
+	 * Handles: DELETE /taskmanager/postupdatetasks Removes a task from the
+	 * list of tasks This is done because of BUG: a call to
+	 * viewContext.putInstanceData inside the servlet returns ERROR 500 after a
+	 * while.
+	 * 
+	 * @param headers
+	 *            http headers
+	 * @param ui
+	 *            uri info
+	 *
+	 * @return the response
+	 */
+	@DELETE
+	@Path("/postupdatetasks/{uri}")
+	@Produces({ "text/html" })
+	public Response delPostUpdateTasks(@PathParam("uri") String uri,
+			@Context HttpHeaders headers, @Context UriInfo ui)
+			throws IOException {
+
+		String response = "";
+		try {
+
+			String current = viewContext.getInstanceData("post-update-tasks");
+			if (current == null)
+				current = "[]";
+
+			JSONArray array = (JSONArray) JSONValue.parse(current);
+			array.remove(URLDecoder.decode(uri));
+
+			viewContext.putInstanceData("post-update-tasks", array.toString());
+
+			/*
+			 * } catch( ParseException pe){ System.out.println("position: " +
+			 * pe.getPosition()); System.out.println(pe); }
+			 */
+		} catch (Exception e) {
+			response += "Failed to remove: current=" + uri + "<br>";
+			response += "Error in service: " + e.toString();
+			return Response.ok(response).type("text/html").build();
+		}
+
+		String entity = "{ \"status\": \"ok\" }";
+		return Response.ok(entity).type("text/html").build();
+	}
+
+	/**
+	 * Handles: POST /taskmanager/postupdatetasks/execute
+	 * 
+	 * Executes all the post installation tasks, after an Ambari Reboot
+	 * 
+	 * @param headers
+	 *            http headers
+	 * @param ui
+	 *            uri info
+	 *
+	 * @return the response
+	 */
+	@POST
+	@Path("/postupdatetasks/execute")
+	@Produces({ "text/html" })
+	public Response executePostUpdateTasks(String body,
+			@Context HttpHeaders headers, @Context UriInfo ui)
+			throws IOException {
+
+		String response = "{ \"status\": \"ok\" }";
+
+		MainStoreApplication mainStoreApplication = new MainStoreApplication(
+				viewContext);
+		response += mainStoreApplication.doPostUpdateTasks();
+
+		return Response.ok(response).type("text/html").build();
+	}
+	
 }
