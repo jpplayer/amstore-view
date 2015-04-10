@@ -506,6 +506,9 @@ public class AmbariStoreServlet extends HttpServlet {
 
 		String output = mainStoreApplication.getAmbariViews().restartAmbari();
 		writer.println(output);
+		
+		// Output script to refresh the page when ready
+		writer.println( waitForAmbariHtml() );
 	}
 
 	// We get called if endpointChecks == false
@@ -651,6 +654,32 @@ public class AmbariStoreServlet extends HttpServlet {
 
 	}
 
+	
+	protected String waitForAmbariHtml() {
+		String html = "<div id='display'></div>"
+				+ "<script src=\"http://code.jquery.com/jquery-1.11.1.min.js\"></script>"
+				+ "<script>\n" + 
+				"    function doPoll(){\n" + 
+				"       $.ajax({\n" + 
+				"          url: '/api/v1/',\n" + 
+				"success: function(result){\n" +
+				" $('#display').html('Ambari ready. Please refresh your browser');" + 
+				"         alert('Ambari ready. Please refresh your browser')\n" + 
+				"          },     \n" + 
+				"          error: function(result){\n" +
+				"          if( result.status == 403 ) { $('#display').html('<font color=red>Ambari ready. Please refresh your browser</font>'); }    " +
+				"              //alert('timeout/error');\n" + 
+				"          else {$('#display').html('Ambari not yet ready.');" + 
+				"			  setTimeout(doPoll,1000);}\n" + 
+				"          }\n" + 
+				"       });\n" + 
+				"    }\n" +
+				"   setTimeout(doPoll,5000);" +
+				"</script>\n" + 
+				"";
+		return html;
+	}
+	
 	/*
 	 * protected void bootstrap(HttpServletResponse response) throws IOException
 	 * { PrintWriter writer = response.getWriter();
