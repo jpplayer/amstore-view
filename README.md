@@ -18,9 +18,38 @@ Ambari Store View
 
 The *Ambari Store View* provides access to a collection of Views and Services.
 
+## Pre-built Installer
+
+curl http://ec2-54-184-106-70.us-west-2.compute.amazonaws.com/amstore/install_store.sh | sh
+
 ## Documentation
 
-TBD
+Provides an interface to manage Ambari Views. Supported operations:
+- Install
+- Update
+- Uninstall
+
+Applications are automatically configured using the Store defaults. Supported endpoints:
+- WebHDFS
+- Hiveserver2
+- WebHCAT
+- Ambari
+
+The Store supports a *Reconfigure* operation to refresh the above endpoints.
+
+Installing views requires a restart of the Ambari server. This is facilitated by a separate 
+REST service (amstore-daemon). The daemon will be removed once restarts are no longer needed.
+
+Instructions to install a view:
+# Select the view
+# Click "Install Selected". This will download the package to the server. No feedback is currently provided, please be patient.
+# Click "Restart Ambari"
+# Refresh your browser when instructed, and re-login
+# Navigate to the *Ambari Store* view and click "Finish installations"
+
+## Limitations
+Only VIEWS are supported in this release. SERVICES will be supported in a future release.
+Not all operations function well, in particular *updates* are not working properly. 
 
 ## License
 
@@ -28,11 +57,11 @@ TBD
 
 ## Build
 
-  mvn clean package
+ sh ./build.sh
 
 ## Install
   
- Run ./install.sh 
+ sh ./install.sh 
 
  Follow the on-screen instructions.
   
