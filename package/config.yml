@@ -1,23 +1,29 @@
-app_id: store
+app_id: ambari-store
+view_name: AMBARI-STORE
+version: '0.1.2'
+
 type: VIEW
 category: administration
-homepage: https://github.com/jpplayer/amstore.git
+homepage: 
 storefront: none
 logo: hortonworks.jpg
-packager: Jean-Philippe Player jp@hortonworks.com
-package: ambari-store-view-0.1.0.jar
+contributor: Jean-Philippe Player <jp@hortonworks.com>
+packager: Jean-Philippe Player <jp@hortonworks.com>
+package: http://ec2-54-184-106-70.us-west-2.compute.amazonaws.com/amstore/ambari-store-0.1.2.jar
 readiness: experimental
 tags: 
- - admin
+ - ambari
 
-view_name: AMBARI-STORE
-version: '0.1.0'
 instance_name: store
 display_name: Ambari Store
-description: Application store for Apache Ambari
+description: Browse and manage applications
 visible: True
 properties: 
-   
-permissions: 
-    group: 
-       - admins
+   amstore.url: amstore.amstore.url
+   amstore.ambari.local.url:  amstore.ambari.local.url
+   amstore.ambari.local.username: amstore.ambari.local.username
+   amstore.ambari.local.password: amstore.ambari.local.password
+   amstore.ambari.cluster.url:  amstore.ambari.cluster.url
+   amstore.ambari.cluster.username: amstore.ambari.cluster.username
+   amstore.ambari.cluster.password: amstore.ambari.cluster.password
+   amstore.stack.version: amstore.stack.version
