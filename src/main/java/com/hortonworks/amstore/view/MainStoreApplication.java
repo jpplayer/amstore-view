@@ -692,6 +692,21 @@ public class MainStoreApplication extends StoreApplication {
 
 	}
 
+	// For debugging
+	public void	cleartasks(){
+		List<String> updates = getPostUpdateTasks();
+		for( String task: updates ){
+			removePostUpdateTask( task );
+		}
+		List<String> installs = getPostInstallTasks();
+		for( String task: installs ){
+			removePostInstallTask( task );
+		}
+		
+		
+	}
+
+	
 	public String removePostInstallTask(String uri) {
 		// Loop through the list, adding elements that don't match
 

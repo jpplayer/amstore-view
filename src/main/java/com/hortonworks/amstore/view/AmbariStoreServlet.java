@@ -162,6 +162,8 @@ public class AmbariStoreServlet extends HttpServlet {
 				action = "restart_ambari";
 			else if (request.getParameter("reconfigure") != null)
 				action = "reconfigure";
+			else if (request.getParameter("cleartasks") != null)
+				action = "cleartasks";
 			else if (request.getParameter("reconfigurepage") != null)
 				action = "reconfigurepage";
 			else if (request.getParameter("check_updates") != null)
@@ -182,6 +184,9 @@ public class AmbariStoreServlet extends HttpServlet {
 			} else if (action.equals("restart_ambari")) {
 				restartAmbari(response);
 			} else if (action.equals("home")) {
+				redirectHome(response);
+			} else if (action.equals("cleartasks")) {
+				mainStoreApplication.cleartasks();
 				redirectHome(response);
 			} else if (action.equals("check_updates")) {
 				// Reload applications from back and refresh to GET
@@ -461,6 +466,11 @@ public class AmbariStoreServlet extends HttpServlet {
 		writer.println("<input disabled type=\"submit\" value=\"Apply to all Installed Applications\" name=\"reconfigureapps\">");
 		writer.println("</td></tr>");
 
+		writer.println("<tr><td colspan=2 align=center>");
+		writer.println("<input type=\"submit\" value=\"Clear tasks\" name=\"cleartasks\">");
+		writer.println("</td></tr>");
+
+		
 		writer.println("<tr><td colspan=2 align=center>");
 		writer.println("<input type=\"submit\" value=\"Return home\" name=\"home\">");
 		writer.println("</td></tr>");
