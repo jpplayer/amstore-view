@@ -38,30 +38,6 @@ public class StoreManager implements View {
 	}
 
 	public void onCreate(ViewInstanceDefinition definition) {
-
-		// Do post-install-tasks
-		
-		
-		/*
-		 * IT DOES NOT APPEAR THAT THERE IS A VIEW CONTEXT ? Note: Only needed
-		 * for the final put(), because we are using the URLStreamProvider.
-		 * AmbariEndpoint ambari = AmbariStoreHelper.getAmbariLocalEndpoint(
-		 * viewContext.getProperties() ); AmbariEndpoint cluster =
-		 * AmbariStoreHelper.getAmbariClusterEndpoint(
-		 * viewContext.getProperties() ); // TODO - This needs to be hardcoded
-		 * in some static properties somewhere. Duplicated in Servlet.
-		 * StoreApplication storeApplication = new StoreApplication(
-		 * "AMBARI-STORE", "0.1.0", "store", "Store", "Ambari Application Store"
-		 * );
-		 * 
-		 * try { Map<String,String> amstore =
-		 * AmbariStoreHelper.getUpdatedStoreProperties( ambari, cluster );
-		 * storeApplication.properties = amstore;
-		 * 
-		 * // POST IT ! AmbariStoreHelper.createOrUpdateViewInstance( ambari,
-		 * viewContext, storeApplication ); } catch( Exception e) { // Ignore
-		 * everything, maybe log or flag something ? }
-		 */
 	}
 
 	public void onDestroy(ViewInstanceDefinition definition) {

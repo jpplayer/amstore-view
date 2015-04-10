@@ -18,20 +18,20 @@
 
 package com.hortonworks.amstore.view;
 
-import java.io.File;
 import java.io.IOException;
-import java.lang.ProcessBuilder.Redirect;
 import java.util.Map;
 
 import org.apache.ambari.view.ViewContext;
-
 import org.json.JSONArray;
 import org.json.JSONObject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class AmbariEndpoint extends Endpoint {
 
-	// null initially, empty if ambari is not managing a cluster
-	// TODO: wrap this logic better !
+	private final static Logger LOG = LoggerFactory
+			.getLogger(AmbariEndpoint.class);
+
 	protected String clusterName;
 
 	public AmbariEndpoint(String url, String username, String password) {
@@ -59,12 +59,11 @@ public class AmbariEndpoint extends Endpoint {
 	}
 
 	public String getClusterName() throws IOException {
-		// Make a REST Call to Ambari if we need to
+		// Lazy init
 		if (clusterName == null) {
 			clusterName = netgetClusterName();
 		}
 		return clusterName;
-
 	}
 
 	// This is only true because we ignore the clusterName
@@ -117,12 +116,10 @@ public class AmbariEndpoint extends Endpoint {
 	}
 
 	protected String netgetClusterName() throws IOException {
-		// get Cluster name
 		JSONObject clusterpage = AmbariStoreHelper.readJsonFromUrl(url
 				+ "/api/v1/clusters", username, password);
 		JSONArray clusters = clusterpage.getJSONArray("items");
 		if (clusters.length() == 0) {
-			// TODO: bad practice. See notes on clusterName variable.
 			clusterName = "";
 		} else {
 			JSONObject cluster = clusters.getJSONObject(0);
@@ -132,22 +129,17 @@ public class AmbariEndpoint extends Endpoint {
 		return clusterName;
 	}
 
-	public String createViewInstance(ViewContext viewContext,
+	public void createViewInstance(ViewContext viewContext,
 			StoreApplication application) throws IOException {
-		return createOrUpdateViewInstance(viewContext, application, "create");
+		createOrUpdateViewInstance(viewContext, application, "create");
 	}
 
-	// TODO: we should receive the desiredProperties (aka mappedProperties),
-	// rather than
-	// get them from the application itself.
-	// Currently pulls the properties from
-	// application.getDesiredInstanceProperties()
-	public String updateViewInstance(ViewContext viewContext,
+	public void updateViewInstance(ViewContext viewContext,
 			StoreApplication application) throws IOException {
-		return createOrUpdateViewInstance(viewContext, application, "update");
+		createOrUpdateViewInstance(viewContext, application, "update");
 	}
 
-	public String createOrUpdateViewInstance(ViewContext viewContext,
+	public void createOrUpdateViewInstance(ViewContext viewContext,
 			StoreApplication application, String operation) throws IOException {
 
 		String data = "[{\n" + "  \"ViewInstanceInfo\" : {\n"
@@ -165,96 +157,24 @@ public class AmbariEndpoint extends Endpoint {
 				+ application.version + "/instances/"
 				+ application.instanceName;
 
-		// TODO: debugging only !
-		String response = data + "<br>" + url + "<br>";
-		// response += jsonRequestToString (
-		// data, url
-		// );
-
-		// debugWriter.println( "about to do this call <br> url=" + ambari.url +
-		// url + "<br>data=" + data );
-
-		// DO THE REQUEST
-		// String response = proxy.request(ambari.url +
-		// url).setData(data).put().asString();
-
-		// TODO: how to avoid passing the ambari instance down ?
-		// PRobably should pass url, user, pass instead
-
-		// TODO: get response as JSON, parse out code. If code != 200 then we
-		// need
-		// to throw an exception.
+		LOG.debug("createOrUpdateViewInstance:" + data + "\n" + url);
 		if (operation.equals("create")) {
 			org.json.simple.JSONObject output = AmbariStoreHelper.doPostAsJson(
 					viewContext.getURLStreamProvider(), this, url, data);
-
-			if (output != null)
-				response += output.toString();
-			/*
-			 * if (output != null && output.get("status") != null &&
-			 * !output.get("status").equals("200")) { throw new
-			 * GenericException(
-			 * "Error in response from Create View. Response Code = " +
-			 * output.get("status"));
-			 */
-
 		} else {
 			org.json.simple.JSONObject output = AmbariStoreHelper.doPutAsJson(
 					viewContext.getURLStreamProvider(), this, url, data);
-			if (output != null)
-				response += output.toString();
-			/*
-			 * TODO: calls to HTTP services should return HTTPResponse. if
-			 * (output != null && output.get("status") != null &&
-			 * !output.get("status").equals("200")) throw new GenericException(
-			 * "Error in response from Update View. Response Code = " +
-			 * output.get("status"));
-			 */
 		}
-		return response;
+		// TODO: check the output
 	}
 
-	public String restartAmbari_oldimpl(ViewContext viewContext)
-			throws IOException {
-
-		String data = "{\n" + "  \"RequestInfo\" : {\n"
-				+ "    \"command\" : \"RESTART_AMBARI\",\n"
-				+ "    \"context\" : \"Restart Ambari Server\"\n" + "    },\n"
-				+ "    \"Requests/resource_filters\": [{\n"
-				+ "    \"service_name\" : \"STOREAGENT\", \n"
-				+ "    \"component_name\" : \"STORE_CLIENT\", \n"
-				+ "    \"hosts\" : \"sandbox.local\" \n" + "    }] \n"
-				+ "    }";
-
-		String url = "/api/v1/clusters/" + clusterName + "/requests";
-
-		String response = ("Attempting to Put to Ambari : " + this.url + " "
-				+ url + " " + data + "<br>");
-
-		return response += AmbariStoreHelper.doPost(
-				viewContext.getURLStreamProvider(), this, url, data);
-
-	}
-
-	public String restartAmbari_oldimpl2() throws IOException {
-
-		ProcessBuilder p = new ProcessBuilder();
-		p.command("nohup", "/etc/init.d/ambari-server", "restart", "&");
-		p.redirectInput(new File("/var/lib/amstore-dummy"));
-		p.redirectOutput(Redirect.appendTo(new File(
-				"/var/log/amstore-agent.log")));
-		p.redirectErrorStream(true);
-		p.start();
-
-		// Runtime.getRuntime().exec("/etc/init.d/ambari-server restart");
-		return "Ambari restart initiated. Please wait.<br>";
-	}
-
+	/*
+	 * Makes a call to the local amstore-daemon. Will be obsolete once an ambari
+	 * restart is no longer required.
+	 */
 	public String restartAmbari() throws IOException {
-
 		String url = "http://localhost:5026/amstore/restart-ambari";
-				
-		return AmbariStoreHelper.readStringFromUrl(url,null,null);
+		return AmbariStoreHelper.readStringFromUrl(url, null, null);
 	}
 
 	// This function calls the Service for postInstallTasks
@@ -272,7 +192,6 @@ public class AmbariEndpoint extends Endpoint {
 
 		return AmbariStoreHelper.doPost(viewContext.getURLStreamProvider(),
 				this, url, "");
-
 	}
 
 	@Override

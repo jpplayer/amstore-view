@@ -20,10 +20,12 @@ package com.hortonworks.amstore.view;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.List;
 import java.util.ArrayList;
+import java.util.Properties;
 import java.util.TreeMap;
 
 import org.apache.ambari.view.ViewContext;
@@ -32,19 +34,22 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.FilenameUtils;
 import org.json.JSONArray;
 import org.json.JSONObject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-// TODO: getters and setters
 public class StoreApplication {
-
+	private final static Logger LOG = LoggerFactory
+			.getLogger(StoreApplication.class);
 	// protected
 	protected String id;
 	protected String app_id;
 	protected String category;
 
-	protected String label; // obsolete. label is View Name
+	protected String label; // obsolete. label is viewName
 	protected String readiness;
 	protected String homepage;
 	protected String uri;
+
 	// These come from the Backend Store.
 	protected Map<String, String> properties = new TreeMap<String, String>();
 	// Used for put()
@@ -59,26 +64,16 @@ public class StoreApplication {
 
 	protected String contributor;
 
-	// name of the instance managed by the Store
-	// public String viewVersion;
-
 	protected String package_uri;
 	protected List<String> tags = new ArrayList<String>();
 
-	// Should only ever be called by inheriting classes, which should
-	// set the main values (viewName, version, etc)
+	/* Should only ever be called by inheriting classes, which should
+	 * set the main values (viewName, version, etc)
+	 */
 	protected StoreApplication(ViewContext viewContext) {
 		this.viewContext = viewContext;
 	}
 	
-	/*
-	 * public StoreApplication(ViewContext viewContext) { this.viewContext =
-	 * viewContext; }
-	 */
-//	public StoreApplication(ViewContext viewContext, String appId) {
-//		this.viewContext = viewContext;
-//	}
-
 	public StoreApplication(ViewContext viewContext, String viewName,
 			String version, String instanceName, String instanceDisplayName,
 			String description) {
@@ -110,7 +105,6 @@ public class StoreApplication {
 		readiness = _s(app, "readiness");
 		homepage = _s(app, "homepage");
 		viewName = _s(app, "view_name");
-		// viewVersion = _s(app, "view_version");
 		instanceName = _s(app, "instance_name");
 		instanceDisplayName = _s(app, "display_name");
 		package_uri = _s(app, "package_uri");
@@ -136,7 +130,16 @@ public class StoreApplication {
 
 	// Returns true if this application represents the Ambari Store itself
 	public boolean isStore() {
-		return app_id.equals("ambari-store");
+		Properties properties = new Properties();
+		InputStream stream = getClass().getClassLoader()
+				.getResourceAsStream("store.properties");
+		try {
+			properties.load(stream);
+			String mainStoreAppId = properties.getProperty("mainStoreAppId");
+			return app_id.equals( mainStoreAppId );
+		} catch (IOException e) {
+			throw new RuntimeException("Error reading property file store.properties.");
+		}
 	}
 
 	public String getId() {
@@ -161,7 +164,6 @@ public class StoreApplication {
 
 	protected String packager;
 
-	// The viewContext
 	protected ViewContext viewContext;
 
 	// Properties from backend Store
@@ -179,17 +181,13 @@ public class StoreApplication {
 	}
 
 	class JSONOutput {
-
 		private Object o;
-
 		JSONOutput(Object o) {
 			this.o = o;
 		}
-
 		public String getString() {
 			return (String) o;
 		}
-
 		public JSONObject getJSONObject() {
 			return (JSONObject) o;
 		}
@@ -225,8 +223,6 @@ public class StoreApplication {
 			String filename = FilenameUtils.getName(package_uri);
 			// Remove any leftover uri characters
 			filename = filename.split("\\?")[0];
-			// substring(0, filename.indexOf('?'));
-
 			return targetPath + "/" + filename;
 		} else
 			return null;
@@ -243,7 +239,6 @@ public class StoreApplication {
 	}
 
 	public String getPackageWorkdir() {
-
 		String workDirectory = "/var/lib/ambari-server/resources/views/work/"
 				+ getViewName() + "{" + getVersion() + "}";
 		return workDirectory;
@@ -316,16 +311,13 @@ public class StoreApplication {
 			deletePackageFile();
 			deleteWorkDirectory();
 		} catch (IOException e) {
-			// Issue a warning TODO
-			// throw new WarningException("Not all files removed successfully");
+			LOG.warn("StoreApplication.deleteApplicationFiles: Not all files removed successfully");
 		}
 	}
 
 	public void downloadPackageFile() {
-
 		if (getPackage_uri() != null) {
-			// Check whether the file is already present (do not
-			// re-download)
+			// Check whether the file is already present (do not re-download)
 			String targetPath = getPackageFilepath();
 			File file = new File(targetPath);
 

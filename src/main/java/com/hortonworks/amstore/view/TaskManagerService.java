@@ -190,7 +190,7 @@ public class TaskManagerService {
 
 		MainStoreApplication mainStoreApplication = new MainStoreApplication(
 				viewContext);
-		response += mainStoreApplication.doPostInstallTasks();
+		mainStoreApplication.doPostInstallTasks();
 
 		return Response.ok(response).type("text/html").build();
 	}
@@ -299,7 +299,7 @@ public class TaskManagerService {
 
 		MainStoreApplication mainStoreApplication = new MainStoreApplication(
 				viewContext);
-		response += mainStoreApplication.doPostUpdateTasks();
+		mainStoreApplication.doPostUpdateTasks();
 
 		return Response.ok(response).type("text/html").build();
 	}
