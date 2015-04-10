@@ -158,7 +158,7 @@ rm -rf "${VIEWS}/work/AMBARI-STORE{$VERSION}"
 rm -f "$VIEWS/ambari-store-$VERSION.jar"
 cp -f target/ambari-store-$VERSION.jar "$VIEWS"
 delete_instance
-install_agent
+#install_agent
 
 ambari-server restart
 echo "Waiting for server to accept requests"
