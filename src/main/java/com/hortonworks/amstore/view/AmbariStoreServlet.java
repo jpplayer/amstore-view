@@ -22,6 +22,8 @@ import org.apache.ambari.view.ViewContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.hortonworks.amstore.view.StoreException.CODE;
+
 import javax.servlet.ServletConfig;
 import javax.servlet.ServletContext;
 import javax.servlet.ServletException;
@@ -33,6 +35,7 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -49,12 +52,15 @@ public class AmbariStoreServlet extends HttpServlet {
 	private static final long serialVersionUID = 1L;
 	private final static Logger LOG = LoggerFactory
 			.getLogger(AmbariStoreServlet.class);
-	
+
 	private ViewContext viewContext;
 	private boolean endpointIssues = true; // we assume the worst
 
 	// The StoreApplication representing the store instance (ie "this")
 	private MainStoreApplication mainStoreApplication = null;
+
+	private PrintWriter writer = null;
+	private List<StoreException> latestExceptions = new LinkedList<StoreException>();
 
 	/*
 	 * List of all available Store Applications. Refreshed on load and when user
@@ -79,13 +85,13 @@ public class AmbariStoreServlet extends HttpServlet {
 			HttpServletResponse response) throws IOException {
 		response.setContentType("text/html");
 		response.setStatus(HttpServletResponse.SC_OK);
+		// very important, used throughout
+		writer = response.getWriter();
 
 		bootstrapjs(response);
-
-		PrintWriter writer = response.getWriter();
-
 		writer.println("<h2>Ambari Store</h2>");
-
+		displayExceptions(latestExceptions);
+		latestExceptions = new LinkedList<StoreException>();
 		try {
 
 			// TODO: remove use of global variable endpointIssues
@@ -120,11 +126,14 @@ public class AmbariStoreServlet extends HttpServlet {
 			HttpServletResponse response) throws ServletException, IOException {
 		response.setContentType("text/html");
 		response.setStatus(HttpServletResponse.SC_OK);
+		// very important, used throughout
+		writer = response.getWriter();
 
 		// Duplicates Get()
-		PrintWriter writer = response.getWriter();
 		bootstrapjs(response);
 		writer.println("<h2>Ambari Store</h2>");
+		displayExceptions(latestExceptions);
+		latestExceptions = new LinkedList<StoreException>();
 		try {
 
 			if (endpointIssues) {
@@ -178,16 +187,22 @@ public class AmbariStoreServlet extends HttpServlet {
 				if (mainStoreApplication.getPostUpdateTasks().size()
 						+ mainStoreApplication.getPostInstallTasks().size() == 0)
 					redirectHome(response);
+				List<StoreException> updateExceptions = new LinkedList<StoreException>();
+				List<StoreException> installExceptions = new LinkedList<StoreException>();
+				;
 				try {
-					mainStoreApplication.doPostUpdateTasks();
-					mainStoreApplication.doPostInstallTasks();
+					updateExceptions = mainStoreApplication.doPostUpdateTasks();
+					installExceptions = mainStoreApplication
+							.doPostInstallTasks();
 					writer.println("Please refresh your browser.");
-				} catch (GenericException e) { 
+				} catch (GenericException e) {
 					writer.println("Could not proceed. Make sure you have restarted Ambari");
 				}
 				if (mainStoreApplication.getPostUpdateTasks().size()
 						+ mainStoreApplication.getPostInstallTasks().size() != 0)
 					writer.println("Not all tasks completed. Make sure you have restarted Ambari");
+				displayExceptions(updateExceptions);
+				displayExceptions(installExceptions);
 			} else { // Process checked apps
 				String[] checked = null;
 				if (request.getParameter("checked") != null) {
@@ -195,22 +210,26 @@ public class AmbariStoreServlet extends HttpServlet {
 					checked = request.getParameterValues("checked");
 
 					if (action.equals("install")) {
-						doInstallation(checked);
+						List<StoreException> exceptions = doInstallation(checked);
+						latestExceptions.addAll(exceptions);
 					} else if (action.equals("update")) {
-						doUpdate(checked);
+						List<StoreException> exceptions = doUpdate(checked);
+						latestExceptions.addAll(exceptions);
 					} else if (action.equals("delete")) {
-						doDelete(checked);
+						List<StoreException> exceptions = doDelete(checked);
+						latestExceptions.addAll(exceptions);
 					} else if (action.equals("uninstall")) {
-						doUninstall(checked);
+						List<StoreException> exceptions = doUninstall(checked);
+						latestExceptions.addAll(exceptions);
 					}
 				}
 				redirectHome(response);
 			}
 
-		}catch (GenericException e){ 
+		} catch (GenericException e) {
 			writer.println("Warning: " + e.getMessage() + "<br>");
 			displayAllApplications(request, response);
-		}catch (NullPointerException e) {
+		} catch (NullPointerException e) {
 			writer.println("NullPointerException caught.<br>");
 			writer.println(GenericException.prettyTrace(e));
 		} catch (Exception e) {
@@ -235,7 +254,7 @@ public class AmbariStoreServlet extends HttpServlet {
 				+ app.instanceDisplayName + "</b></td></tr>");
 		writer.println("<tr></tr>");
 		writer.println("<tr><td>app_id</td><td>" + app.app_id + "</td></tr>");
-		writer.println("<tr><td>View Name</td><td>" + app.viewName
+		writer.println("<tr><td>Name</td><td>" + app.getCanonicalName()
 				+ "</td></tr>");
 		writer.println("<tr><td>Version</td><td>" + app.version + "</td></tr>");
 		writer.println("<tr><td>Instance Name</td><td>" + app.instanceName
@@ -290,7 +309,7 @@ public class AmbariStoreServlet extends HttpServlet {
 			writer.println("</tr></table>");
 		}
 
-		// TODO: unsafe. Indexed by instanceName
+		// TODO: unsafe. Indexed by canonicalName
 		Map<String, StoreApplication> installedApplications = mainStoreApplication
 				.getInstalledApplications();
 
@@ -314,6 +333,7 @@ public class AmbariStoreServlet extends HttpServlet {
 		writer.println("<th>Name</th>");
 		writer.println("<th>Version</th>");
 		writer.println("<th>Description</th>");
+		writer.println("<th>Type</th>");
 		writer.println("<th>Readiness</th>");
 		writer.println("<th>Installed</th>");
 		writer.println("<th></th>");
@@ -335,21 +355,21 @@ public class AmbariStoreServlet extends HttpServlet {
 			writer.println(app.version);
 			writer.println("</td>");
 			writer.println("<td>" + app.description + "</td>");
+			writer.println("<td>" + app.getType() + "</td>");
 			writer.println("<td>");
-
 			writer.println(app.readiness);
 			writer.println("</td>");
 
 			writer.println("<td>");
-			if (installedApplications.containsKey(app.getInstanceName())) {
-				writer.println(installedApplications.get(app.getInstanceName())
-						.getVersion());
+			if (installedApplications.containsKey(app.getCanonicalName())) {
+				writer.println(installedApplications
+						.get(app.getCanonicalName()).getVersion());
 			}
 			writer.println("</td>");
 
 			writer.println("<td>");
-			if (installedApplications.containsKey(app.getInstanceName())
-					&& !installedApplications.get(app.getInstanceName())
+			if (installedApplications.containsKey(app.getCanonicalName())
+					&& !installedApplications.get(app.getCanonicalName())
 							.getVersion().equals(app.getVersion())) {
 				writer.println("update");
 			}
@@ -371,6 +391,9 @@ public class AmbariStoreServlet extends HttpServlet {
 		writer.println("<input type=\"submit\" value=\"Uninstall Selected\" name=\"uninstall\"/>");
 		writer.println("<input type=\"submit\" value=\"Reconfigure Store\" name=\"reconfigurepage\">");
 		writer.println("</form>");
+
+		// writer.println("<br>");
+		// displayInstalledApplicationInformation(response);
 	}
 
 	private void displayPreferences(HttpServletRequest request,
@@ -433,7 +456,6 @@ public class AmbariStoreServlet extends HttpServlet {
 		writer.println("<input type=\"submit\" value=\"Clear tasks\" name=\"cleartasks\">");
 		writer.println("</td></tr>");
 
-		
 		writer.println("<tr><td colspan=2 align=center>");
 		writer.println("<input type=\"submit\" value=\"Return home\" name=\"home\">");
 		writer.println("</td></tr>");
@@ -443,9 +465,9 @@ public class AmbariStoreServlet extends HttpServlet {
 		writer.println("</form>");
 	}
 
-	/* 
-	 * Reconfigure the Ambari Store Properties, based on configured 
-	 * Ambari Server Endpoints
+	/*
+	 * Reconfigure the Ambari Store Properties, based on configured Ambari
+	 * Server Endpoints
 	 */
 	protected void reconfigure(HttpServletRequest request,
 			HttpServletResponse response) throws IOException {
@@ -466,7 +488,7 @@ public class AmbariStoreServlet extends HttpServlet {
 
 		String output = mainStoreApplication.getAmbariViews().restartAmbari();
 		writer.println(output);
-		writer.println( waitForAmbariHtml() );
+		writer.println(waitForAmbariHtml());
 	}
 
 	// We get called if endpointChecks == false
@@ -524,33 +546,62 @@ public class AmbariStoreServlet extends HttpServlet {
 		writer.println("For more information see <a href='http://wiki.hortonworks.com'>http://wiki.hortonworks.com</a>");
 	}
 
-	// deletes instance
-	private void doDelete(String[] app_ids) {
-		if (app_ids == null || app_ids.length == 0)
-			return;
-		LOG.debug("Starting deletions.\n");
-		for (String app_id : app_ids) {
-			mainStoreApplication.deleteApplication(app_id);
+	// For debug
+	private void displayInstalledApplicationInformation(
+			HttpServletResponse response) throws IOException {
+		PrintWriter writer = response.getWriter();
+		Map<String, StoreApplication> installedApplications = mainStoreApplication
+				.getInstalledApplications();
+		writer.println("<table>");
+		for (Entry<String, StoreApplication> app : installedApplications
+				.entrySet()) {
+			writer.println("<tr>");
+			writer.println("<td>" + app.getKey() + "</td>");
+			if (app.getValue().isView())
+				writer.println("<td>" + app.getValue().getViewName() + "</td>");
+			else
+				writer.println("<td>"
+						+ ((StoreApplicationService) app.getValue())
+								.getServiceName() + "</td>");
+
+			writer.println("<td>" + app.getValue().getInstanceName() + "</td>");
+			writer.println("</tr>");
 		}
+		writer.println("</table>");
 	}
 
-	// Like doDelete, deletes instance but also all associated files.
-	private void doUninstall(String[] app_ids) {
+	private void displayExceptions(List<StoreException> exceptions) {
+			for (StoreException e : exceptions) {
+				// Only display errors or warnings
+				if (e.getCode() == CODE.ERROR || e.getCode() == CODE.WARNING ) {
+					writer.println("<br><pre>" + "Exception:\n" + e.getMessage() + "</pre>");
+				}
+			}
+	}
+
+	private List<StoreException> doInstallation(String[] app_ids) {
+		List<StoreException> exceptions = new LinkedList<StoreException>();
 		if (app_ids == null || app_ids.length == 0)
-			return;
-		LOG.debug("Starting Uninstall.\n");
+			return exceptions;
+		LOG.debug("Starting Installations.\n");
+
 		for (String app_id : app_ids) {
 			try {
-				mainStoreApplication.uninstallApplication(app_id);
-			} catch (IOException e) {
-				// TODO: we ignore any issues
+				mainStoreApplication.installApplication(app_id);
+			} catch (StoreException e) {
+				exceptions.add(e);
 			}
 		}
+		List<StoreException> postInstallExceptions = mainStoreApplication
+				.doPostInstallTasks();
+		exceptions.addAll(postInstallExceptions);
+		return exceptions;
 	}
 
-	private void doUpdate(String[] app_ids) {
+	private List<StoreException> doUpdate(String[] app_ids) {
+		List<StoreException> exceptions = new LinkedList<StoreException>();
 		if (app_ids == null || app_ids.length == 0)
-			return;
+			return exceptions;
 		LOG.debug("Starting Updates.\n");
 
 		for (String app_id : app_ids) {
@@ -558,19 +609,47 @@ public class AmbariStoreServlet extends HttpServlet {
 				mainStoreApplication.updateApplication(app_id);
 			} catch (IOException e) {
 				// TODO: we ignore any issues
+			} catch (StoreException e) {
+				exceptions.add(e);
 			}
 		}
+		return exceptions;
 	}
 
-	private void doInstallation(String[] app_ids) {
+	// deletes instance
+	// TODO: we ignore all exceptions
+	private List<StoreException> doDelete(String[] app_ids) {
+		List<StoreException> exceptions = new LinkedList<StoreException>();
 		if (app_ids == null || app_ids.length == 0)
-			return;
-		LOG.debug("Starting Installations.\n");
-
+			return exceptions;
+		LOG.debug("Starting deletions.\n");
 		for (String app_id : app_ids) {
-			mainStoreApplication.installApplication(app_id);
+			// try {
+			mainStoreApplication.deleteApplication(app_id);
+			// } catch(StoreException e){
+			// exceptions.add(e);
+			// }
 		}
-		mainStoreApplication.doPostInstallTasks();
+		return exceptions;
+	}
+
+	// Like doDelete, deletes instance but also all associated files.
+	// TODO: add exceptions
+	private List<StoreException> doUninstall(String[] app_ids) {
+		List<StoreException> exceptions = new LinkedList<StoreException>();
+		if (app_ids == null || app_ids.length == 0)
+			return exceptions;
+		LOG.debug("Starting Uninstall.\n");
+		for (String app_id : app_ids) {
+			try {
+				mainStoreApplication.uninstallApplication(app_id);
+			} catch (IOException e) {
+				// TODO: we ignore any issues
+				// } catch (StoreException e){
+
+			}
+		}
+		return exceptions;
 	}
 
 	protected void redirectHome(HttpServletResponse response)
@@ -592,32 +671,28 @@ public class AmbariStoreServlet extends HttpServlet {
 	}
 
 	/*
-	 * Outputs Javascript that waits for Ambari to restart.
-	 * Will be part of proper template once we move to Ember.
+	 * Outputs Javascript that waits for Ambari to restart. Will be part of
+	 * proper template once we move to Ember.
 	 */
 	protected String waitForAmbariHtml() {
 		String html = "<div id='display'></div>"
 				+ "<script src=\"http://code.jquery.com/jquery-1.11.1.min.js\"></script>"
-				+ "<script>\n" + 
-				"    function doPoll(){\n" + 
-				"       $.ajax({\n" + 
-				"          url: '/api/v1/',\n" + 
-				"success: function(result){\n" +
-				" $('#display').html('Ambari ready. Please refresh your browser');" + 
-				"         alert('Ambari is ready. Please refresh your browser')\n" + 
-				"          },     \n" + 
-				"          error: function(result){\n" +
-				"          if( result.status == 403 ) { $('#display').html('<font color=red>Ambari ready. Please refresh your browser</font>'); }    " +
-				"              //alert('timeout/error');\n" + 
-				"          else {$('#display').html('Ambari is restarting. Please wait ...');" + 
-				"			  setTimeout(doPoll,1000);}\n" + 
-				"          }\n" + 
-				"       });\n" + 
-				"    }\n" +
-				"   setTimeout(doPoll,5000);" +
-				"</script>\n" + 
-				"";
+				+ "<script>\n"
+				+ "    function doPoll(){\n"
+				+ "       $.ajax({\n"
+				+ "          url: '/api/v1/',\n"
+				+ "success: function(result){\n"
+				+ " $('#display').html('Ambari ready. Please refresh your browser');"
+				+ "         alert('Ambari is ready. Please refresh your browser')\n"
+				+ "          },     \n"
+				+ "          error: function(result){\n"
+				+ "          if( result.status == 403 ) { $('#display').html('<font color=red>Ambari ready. Please refresh your browser</font>'); }    "
+				+ "              //alert('timeout/error');\n"
+				+ "          else {$('#display').html('Ambari is restarting. Please wait ...');"
+				+ "			  setTimeout(doPoll,1000);}\n" + "          }\n"
+				+ "       });\n" + "    }\n" + "   setTimeout(doPoll,5000);"
+				+ "</script>\n" + "";
 		return html;
 	}
-	
+
 }

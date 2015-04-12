@@ -37,7 +37,7 @@ import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class StoreApplication {
+public abstract class StoreApplication {
 	private final static Logger LOG = LoggerFactory
 			.getLogger(StoreApplication.class);
 	// protected
@@ -56,8 +56,12 @@ public class StoreApplication {
 	protected Map<String, String> desiredInstanceProperties = null;
 
 	// Settings from view.xml
+	protected String type;
+
+	// TODO: move into StoreApplicationView
 	protected String viewName;
-	protected String version;
+
+	protected String version = "";
 	protected String instanceName;
 	protected String instanceDisplayName;
 	protected String description;
@@ -67,17 +71,15 @@ public class StoreApplication {
 	protected String package_uri;
 	protected List<String> tags = new ArrayList<String>();
 
-	/* Should only ever be called by inheriting classes, which should
-	 * set the main values (viewName, version, etc)
+	/*
+	 * Should only ever be called by inheriting classes, which should set the
+	 * main values (viewName, version, etc)
 	 */
-	protected StoreApplication(ViewContext viewContext) {
-		this.viewContext = viewContext;
+	protected StoreApplication() {
 	}
-	
-	public StoreApplication(ViewContext viewContext, String viewName,
-			String version, String instanceName, String instanceDisplayName,
-			String description) {
-		this.viewContext = viewContext;
+
+	public StoreApplication(String viewName, String version,
+			String instanceName, String instanceDisplayName, String description) {
 		this.viewName = viewName;
 		this.version = version;
 		this.instanceName = instanceName;
@@ -85,61 +87,97 @@ public class StoreApplication {
 		this.description = description;
 	}
 
-	public StoreApplication(ViewContext viewContext,
-			ViewInstanceDefinition viewInstanceDefinition) {
-		this.viewContext = viewContext;
-		this.viewName = viewInstanceDefinition.getViewName();
-		this.version = viewInstanceDefinition.getViewDefinition().getVersion();
-		this.instanceName = viewInstanceDefinition.getInstanceName();
-		this.instanceDisplayName = viewInstanceDefinition.getLabel();
-		this.description = viewInstanceDefinition.getDescription();
+	public StoreApplication(JSONObject app) {
+		setVariablesFromJson(app);
 	}
 
-	public StoreApplication(JSONObject app) {
-		id = _s(app, "id");
-		uri = _s(app, "uri");
-		app_id = _s(app, "app_id");
-		version = _s(app, "version");
-		category = _s(app, "category");
-		description = _s(app, "description");
-		readiness = _s(app, "readiness");
-		homepage = _s(app, "homepage");
-		viewName = _s(app, "view_name");
-		instanceName = _s(app, "instance_name");
-		instanceDisplayName = _s(app, "display_name");
-		package_uri = _s(app, "package_uri");
+	@SuppressWarnings("static-access")
+	protected void setVariablesFromJson(JSONObject app) {
+		AmbariStoreHelper h = new AmbariStoreHelper();
+		id = h._s(app, "id");
+		uri = h._s(app, "uri");
+		type = h._s(app, "type");
+		app_id = h._s(app, "app_id");
+		version = h._s(app, "version");
+		category = h._s(app, "category");
+		description = h._s(app, "description");
+		readiness = h._s(app, "readiness");
+		homepage = h._s(app, "homepage");
+		viewName = h._s(app, "view_name");
+		instanceName = h._s(app, "instance_name");
+		instanceDisplayName = h._s(app, "display_name");
+		package_uri = h._s(app, "package_uri");
 
-		contributor = _s(app, "contributor");
-		packager = _s(app, "packager");
+		contributor = h._s(app, "contributor");
+		packager = h._s(app, "packager");
 
-		JSONArray atags = _a(app, "tags");
+		JSONArray atags = h._a(app, "tags");
 		for (int j = 0; j < atags.length(); j++) {
 			tags.add(atags.getString(j));
 		}
 
-		JSONObject props = _o(app, "properties");
+		JSONObject props = h._o(app, "properties");
 		if (props != null) {
 			Iterator<?> keys = props.keys();
 			while (keys.hasNext()) {
 				String key = (String) keys.next();
-				properties.put(key, _s(props, key));
+				properties.put(key, h._s(props, key));
 			}
 		}
 
 	}
 
+	/*
+	 * Abstract methods
+	 */
+	public abstract void deleteApplicationFiles();
+
+	public abstract String getPackageWorkdir();
+
+	public abstract void doInstallStage1(AmbariEndpoint localAmbari) throws IOException, StoreException;
+
+	public abstract void doInstallStage2(AmbariEndpoint ambari,
+			boolean reinstall) throws IOException, StoreException;
+
+	public abstract void doUpdateStage1(StoreApplication newApplication)
+			throws IOException, StoreException;
+
+	public abstract void doUpdateStage2(AmbariEndpoint ambari,
+			StoreApplication newApplication) throws IOException, StoreException;
+
+	public abstract void doUninstallStage1() throws IOException, StoreException;
+
+	/*
+	 * This method is used to quickly lookup an installed application (without
+	 * the version) views: view-$viewName-$instanceName services:
+	 * service-$serviceName assembly: assembly-$assemblyName
+	 */
+	public abstract String getCanonicalName();
+
 	// Returns true if this application represents the Ambari Store itself
+	// TODO: ensure the value is set correctly by the Factory, so we can simply
+	// overload
+	// correctly
 	public boolean isStore() {
 		Properties properties = new Properties();
-		InputStream stream = getClass().getClassLoader()
-				.getResourceAsStream("store.properties");
+		InputStream stream = getClass().getClassLoader().getResourceAsStream(
+				"store.properties");
 		try {
 			properties.load(stream);
 			String mainStoreAppId = properties.getProperty("mainStoreAppId");
-			return app_id.equals( mainStoreAppId );
+			return app_id.equals(mainStoreAppId);
 		} catch (IOException e) {
-			throw new RuntimeException("Error reading property file store.properties.");
+			throw new RuntimeException(
+					"Error reading property file store.properties.");
 		}
+	}
+
+	public boolean isView() {
+		return this instanceof StoreApplicationView;
+	}
+
+	public boolean isService() {
+		return this instanceof StoreApplicationService;
 	}
 
 	public String getId() {
@@ -164,8 +202,6 @@ public class StoreApplication {
 
 	protected String packager;
 
-	protected ViewContext viewContext;
-
 	// Properties from backend Store
 	public Map<String, String> getBackendProperties() {
 		return properties;
@@ -182,50 +218,18 @@ public class StoreApplication {
 
 	class JSONOutput {
 		private Object o;
+
 		JSONOutput(Object o) {
 			this.o = o;
 		}
+
 		public String getString() {
 			return (String) o;
 		}
+
 		public JSONObject getJSONObject() {
 			return (JSONObject) o;
 		}
-	}
-
-	private String _s(JSONObject o, String s) {
-		try {
-			return o.getString(s);
-		} catch (Exception e) {
-			return null;
-		}
-	}
-
-	private JSONObject _o(JSONObject o, String s) {
-		try {
-			return (JSONObject) o.get(s);
-		} catch (Exception e) {
-			return null;
-		}
-	}
-
-	private JSONArray _a(JSONObject o, String s) {
-		try {
-			return (JSONArray) o.getJSONArray(s);
-		} catch (Exception e) {
-			return new JSONArray("[]");
-		}
-	}
-
-	public String getPackageFilepath() {
-		if (package_uri != null) {
-			String targetPath = "/var/lib/ambari-server/resources/views";
-			String filename = FilenameUtils.getName(package_uri);
-			// Remove any leftover uri characters
-			filename = filename.split("\\?")[0];
-			return targetPath + "/" + filename;
-		} else
-			return null;
 	}
 
 	public String getViewName() {
@@ -236,12 +240,6 @@ public class StoreApplication {
 
 	public String getVersion() {
 		return version;
-	}
-
-	public String getPackageWorkdir() {
-		String workDirectory = "/var/lib/ambari-server/resources/views/work/"
-				+ getViewName() + "{" + getVersion() + "}";
-		return workDirectory;
 	}
 
 	public String getApp_id() {
@@ -292,41 +290,17 @@ public class StoreApplication {
 		return tags;
 	}
 
-	public ViewContext getViewContext() {
-		return viewContext;
+	public String getType() {
+		return type;
 	}
 
-	public void deletePackageFile() throws IOException {
-		String packagePath = getPackageFilepath();
-		FileUtils.forceDelete(new File(packagePath));
+	public void setType(String type) {
+		this.type = type;
 	}
 
 	public void deleteWorkDirectory() throws IOException {
 		String workDirectory = getPackageWorkdir();
 		FileUtils.deleteDirectory(new File(workDirectory));
-	}
-
-	public void deleteApplicationFiles() {
-		try {
-			deletePackageFile();
-			deleteWorkDirectory();
-		} catch (IOException e) {
-			LOG.warn("StoreApplication.deleteApplicationFiles: Not all files removed successfully");
-		}
-	}
-
-	public void downloadPackageFile() {
-		if (getPackage_uri() != null) {
-			// Check whether the file is already present (do not re-download)
-			String targetPath = getPackageFilepath();
-			File file = new File(targetPath);
-
-			if (!file.isFile()) {
-				// How can we do this in a thread and provide download
-				// update ? TODO
-				AmbariStoreHelper.downloadFile(getPackage_uri(), targetPath);
-			}
-		}
 	}
 
 }
