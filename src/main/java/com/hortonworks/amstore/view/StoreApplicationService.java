@@ -157,7 +157,7 @@ public class StoreApplicationService extends StoreApplication {
 	public void doInstallStage2(AmbariEndpoint ambari, boolean reinstall)
 			throws IOException, StoreException {
 		// Check that the service is installed
-		if( ambari.getListInstalledServiceNames().contains( getServiceName() )){
+		if( ! ambari.getListInstalledServiceNames().contains( getServiceName() )){
 			throw new StoreException("Info: Service not yet installed. Cannot proceed.", CODE.INFO);
 		}
 		// Kick off automated installation if requested.
