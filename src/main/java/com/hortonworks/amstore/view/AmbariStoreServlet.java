@@ -22,6 +22,7 @@ import org.apache.ambari.view.ViewContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.hortonworks.amstore.view.AmbariEndpoint.ServicesConfiguration;
 import com.hortonworks.amstore.view.StoreException.CODE;
 
 import javax.servlet.ServletConfig;
@@ -109,6 +110,7 @@ public class AmbariStoreServlet extends HttpServlet {
 			}
 
 			displayAllApplications(request, response);
+			//displayInstalledServicesInformation();
 
 		} catch (NullPointerException e) {
 			writer.println("NullPointerException caught.<br>");
@@ -200,7 +202,7 @@ public class AmbariStoreServlet extends HttpServlet {
 				}
 				if (mainStoreApplication.getPostUpdateTasks().size()
 						+ mainStoreApplication.getPostInstallTasks().size() != 0)
-					writer.println("Not all tasks completed. Make sure you have restarted Ambari");
+					writer.println("Not all tasks completed. Make sure you have restarted Ambari. Services must be installed manually.");
 				displayExceptions(updateExceptions);
 				displayExceptions(installExceptions);
 			} else { // Process checked apps
@@ -274,13 +276,16 @@ public class AmbariStoreServlet extends HttpServlet {
 		writer.println("<tr><td>Properties</td></tr>");
 		writer.println("<tr></tr>");
 
+		try {
 		Map<String, String> mapped = mainStoreApplication
 				.getMappedProperties(app);
 		for (Entry<String, String> e : app.getBackendProperties().entrySet()) {
 			writer.println("<tr><td>" + e.getKey() + "</td><td>" + e.getValue()
 					+ "</td><td>" + mapped.get(e.getKey()) + "</td></tr>");
 		}
-
+		} catch (StoreException e){
+			writer.println("<tr><td>Exception:" + e.getMessage() + "</td></tr>");
+		}
 		writer.println("</table>");
 
 	}
@@ -386,7 +391,7 @@ public class AmbariStoreServlet extends HttpServlet {
 		writer.println("</div>");
 		writer.println("<br/>");
 		writer.println("<input type=\"submit\" value=\"Install Selected\" name=\"install\"/>");
-		writer.println("<input type=\"submit\" value=\"Update Selected\" name=\"update\"/>");
+		writer.println("<input disabled type=\"submit\" value=\"Update Selected (not implemented)\" name=\"update\"/>");
 		writer.println("<input type=\"submit\" value=\"Delete Selected\" name=\"delete\"/>");
 		writer.println("<input type=\"submit\" value=\"Uninstall Selected\" name=\"uninstall\"/>");
 		writer.println("<input type=\"submit\" value=\"Reconfigure Store\" name=\"reconfigurepage\">");
@@ -449,7 +454,7 @@ public class AmbariStoreServlet extends HttpServlet {
 		writer.println("</td></tr>");
 
 		writer.println("<tr><td colspan=2 align=center>");
-		writer.println("<input disabled type=\"submit\" value=\"Apply to all Installed Applications\" name=\"reconfigureapps\">");
+		writer.println("<input disabled type=\"submit\" value=\"Apply to all Installed Applications (not implemented)\" name=\"reconfigureapps\">");
 		writer.println("</td></tr>");
 
 		writer.println("<tr><td colspan=2 align=center>");
@@ -569,6 +574,35 @@ public class AmbariStoreServlet extends HttpServlet {
 		}
 		writer.println("</table>");
 	}
+	
+	// For debug
+	private void displayInstalledServicesInformation() throws IOException {
+		AmbariEndpoint.ServicesConfiguration servicesConfiguration = mainStoreApplication.getAmbariCluster()
+				.getServicesConfiguration();
+		writer.println("<table>");
+
+		for( Entry<String,AmbariEndpoint.ServiceConfiguration> s: servicesConfiguration.getMap().entrySet() ){
+			writer.println("<tr>");
+			writer.println("<td>" + s.getKey() + "</td>");
+			writer.println("<td>");
+
+			writer.println("<table>");
+			for( Entry<String,String> e: s.getValue().getMap().entrySet() ){
+				writer.println("<tr>");
+				writer.println("<td>" + e.getKey() + "</td>");
+				writer.println("<td>" + e.getValue() + "</td>");
+				writer.println("</tr>");
+			}
+			writer.println("</table>");
+
+			writer.println("</td>");
+			writer.println("<tr>");
+
+		}
+		writer.println("</table>");
+	}
+	
+
 
 	private void displayExceptions(List<StoreException> exceptions) {
 			for (StoreException e : exceptions) {

@@ -26,6 +26,7 @@ import org.json.simple.parser.ParseException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.hortonworks.amstore.view.AmbariEndpoint.ServicesConfiguration;
 import com.hortonworks.amstore.view.utils.ServiceFormattedException;
 
 public class MainStoreApplication extends StoreApplicationView {
@@ -74,38 +75,82 @@ public class MainStoreApplication extends StoreApplicationView {
 	 * special values: {{username}} maps to ${username} {{viewName}} maps to
 	 * ${viewName} {{instanceName}} maps to ${instanceName}
 	 */
-	public Map<String, String> getMappedProperties(StoreApplication application) {
+	// TODO: unsafe from a security standpoint. Too easy to get passwords.
+	public Map<String, String> getMappedProperties(StoreApplication application)
+			throws StoreException {
 		Map<String, String> mapped = new TreeMap<String, String>();
 
 		// Mappings are mostly the configured properties
 		// But we always assign the "cluster" ones even if null.
-		Map<String, String> mappings = getIntanceProperties();
+
+		// We copy the properties from the mainStoreApplication as a baseline.
+		// TODO: security - unsafe
+		Map<String, String> amstoreMappings = getIntanceProperties();
+		// Map<String, String> mappings = new TreeMap<String, String>();
 
 		// Views Ambari
-		mappings.put("amstore.ambari.views.url", ambariViews.getUrl());
-		mappings.put("amstore.ambari.views.clusterurl",
+		amstoreMappings.put("amstore.ambari.views.url", ambariViews.getUrl());
+		amstoreMappings.put("amstore.ambari.views.clusterurl",
 				ambariViews.getClusterApiEndpoint());
-		mappings.put("amstore.ambari.views.username", ambariViews.getUsername());
-		mappings.put("amstore.ambari.views.password", ambariViews.getPassword());
+		amstoreMappings.put("amstore.ambari.views.username",
+				ambariViews.getUsername());
+		amstoreMappings.put("amstore.ambari.views.password",
+				ambariViews.getPassword());
 
 		// Cluster Ambari
-		mappings.put("amstore.ambari.cluster.url", ambariCluster.getUrl());
-		mappings.put("amstore.ambari.cluster.clusterurl",
+		amstoreMappings.put("amstore.ambari.cluster.url",
+				ambariCluster.getUrl());
+		amstoreMappings.put("amstore.ambari.cluster.clusterurl",
 				ambariCluster.getClusterApiEndpoint());
-		mappings.put("amstore.ambari.cluster.username",
+		amstoreMappings.put("amstore.ambari.cluster.username",
 				ambariCluster.getUsername());
-		mappings.put("amstore.ambari.cluster.password",
+		amstoreMappings.put("amstore.ambari.cluster.password",
 				ambariCluster.getPassword());
 
-		for (Entry<String, String> e : application.getBackendProperties()
-				.entrySet()) {
+		/*
+		 * Old style: hardcode mappings in store. We no longer do this. for
+		 * (Entry<String, String> e : application.getBackendProperties()
+		 * .entrySet()) {
+		 * 
+		 * if (mappings.containsKey(e.getValue())) { mapped.put(e.getKey(),
+		 * parseSpecials(mappings.get(e.getValue()))); } else {
+		 * mapped.put(e.getKey(), parseSpecials(e.getValue())); } }
+		 */
 
-			if (mappings.containsKey(e.getValue())) {
-				mapped.put(e.getKey(),
-						parseSpecials(mappings.get(e.getValue())));
-			} else {
-				mapped.put(e.getKey(), parseSpecials(e.getValue()));
+		/*
+		 * We map properties based on configured services in Ambari Must use a
+		 * ClusterAmbari.
+		 */
+		try {
+
+			for (Entry<String, String> e : application.getBackendProperties()
+					.entrySet()) {
+
+				// if e.getValue() needs replacing
+				String field = e.getValue();
+				if( field == null) {
+					// do nothing
+				} else if (field.startsWith("ambari.")) {
+					// Calls the store the first time. Keeping it here ensures it only
+					// gets called if we really have to. Not efficient.
+					ServicesConfiguration servicesConfiguration = getAmbariCluster()
+							.getServicesConfiguration();
+					String config = field.split("\\.")[1];
+					String property = field.split("\\.", 3)[2];
+					String replacement = servicesConfiguration.get(config).get(
+							property);
+					mapped.put(e.getKey(), parseSpecials(replacement));
+				} else if (field.startsWith("amstore.")) {
+					mapped.put(e.getKey(),
+							parseSpecials(amstoreMappings.get(e.getValue())));
+				} else {
+					mapped.put(e.getKey(), parseSpecials(e.getValue()));
+				}
+
 			}
+		} catch (IOException e) {
+			throw new StoreException(
+					"Unable to obtain Ambari services properties.");
 		}
 		return mapped;
 	}
@@ -173,7 +218,6 @@ public class MainStoreApplication extends StoreApplicationView {
 		return getAmbariViews();
 	}
 
-	
 	public AmbariEndpoint getAmbariRemote() {
 		return AmbariEndpoint.getAmbariRemoteEndpoint(viewContext);
 	}
@@ -337,7 +381,8 @@ public class MainStoreApplication extends StoreApplicationView {
 		 */
 	}
 
-	public void updateApplication(String appId) throws IOException, StoreException {
+	public void updateApplication(String appId) throws IOException,
+			StoreException {
 		LOG.debug("Starting downloads for updates.");
 
 		Map<String, StoreApplication> availableApplications = getStoreEndpoint()
@@ -384,7 +429,7 @@ public class MainStoreApplication extends StoreApplicationView {
 				.getAllApplicationsFromStore();
 		StoreApplication app = availableApplications.get(appId);
 		try {
-			app.doInstallStage1( getAmbariLocal() );
+			app.doInstallStage1(getAmbariLocal());
 		} catch (IOException e) {
 			LOG.warn("IOException downloading application:" + appId);
 		}
@@ -413,7 +458,7 @@ public class MainStoreApplication extends StoreApplicationView {
 
 		AmbariEndpoint cluster = getAmbariCluster();
 		// Validates correct access to the Hadoop cluster's Ambari
-		String baseurl = cluster.url + "/api/v1/clusters/"
+		String baseurl = cluster.getUrl() + "/api/v1/clusters/"
 				+ cluster.getClusterName();
 
 		// WEBHDFS
@@ -557,11 +602,12 @@ public class MainStoreApplication extends StoreApplicationView {
 			LOG.debug(response);
 
 			if (application.isView()) {
-				// TODO: dangerous. Should be encapsulated.
-				application
-						.setDesiredInstanceProperties(getMappedProperties(application));
 
 				try {
+					// TODO: dangerous. Should be encapsulated.
+					application
+							.setDesiredInstanceProperties(getMappedProperties(application));
+
 					Map<String, ViewInstanceDefinition> installedViews = getInstancedViews();
 					boolean isreinstall;
 					if (installedViews.containsKey(application.instanceName)) {
@@ -576,7 +622,7 @@ public class MainStoreApplication extends StoreApplicationView {
 				} catch (ServiceFormattedException e) {
 					LOG.warn("ServiceFormattedException:" + e.toString());
 				} catch (StoreException e) {
-					LOG.warn("StoreExceptionw:" + e.toString());
+					LOG.warn("StoreException:" + e.toString());
 					exceptions.add(e);
 				} catch (IOException e) {
 					LOG.warn("IOException:" + e.toString());
@@ -586,6 +632,7 @@ public class MainStoreApplication extends StoreApplicationView {
 				try {
 					// TODO: remove hardcoded "false"
 					application.doInstallStage2(getAmbariCluster(), false);
+					removePostInstallTask(uri);
 				} catch (ServiceFormattedException e) {
 					LOG.warn("ServiceFormattedException:" + e.toString());
 				} catch (StoreException e) {

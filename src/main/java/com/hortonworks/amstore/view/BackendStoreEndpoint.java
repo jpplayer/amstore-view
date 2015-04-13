@@ -40,19 +40,19 @@ public class BackendStoreEndpoint extends Endpoint {
 	// @Override
 	public boolean isAvailable() {
 		boolean result = false;
-		if (url == null)
+		if (getUrl() == null)
 			return false;
 
 		try {
 			// Call the Ambari Store
-			JSONObject json = AmbariStoreHelper.readJsonFromUrl(url
+			JSONObject json = AmbariStoreHelper.readJsonFromUrl(getUrl()
 					+ "/api/v1/status");
 			// This is NOT the HTTP CODE
 			String code = (String) json.get("code");
 			if (code != null && code.equals("200"))
 				result = true;
 		} catch (IOException e) {
-			LOG.debug("IOException contacting " + url + "/api/v1/status");
+			LOG.debug("IOException contacting " + getUrl() + "/api/v1/status");
 		}
 		return result;
 	}
@@ -61,7 +61,7 @@ public class BackendStoreEndpoint extends Endpoint {
 			String version) {
 
 			// Lookup application by exact version. Returns null if not found.
-			String application_uri = url + "/api/v1/applications/" + appId
+			String application_uri = getUrl() + "/api/v1/applications/" + appId
 					+ "-" + version;
 			return netgetApplicationFromStoreByUri( application_uri );
 	}
@@ -125,7 +125,7 @@ public class BackendStoreEndpoint extends Endpoint {
 		Map<String, StoreApplication> storeApplications = new TreeMap<String, StoreApplication>();
 		try {
 			// Call the Ambari Store
-			JSONObject applications = AmbariStoreHelper.readJsonFromUrl(url
+			JSONObject applications = AmbariStoreHelper.readJsonFromUrl(getUrl()
 					+ "/api/v1/applications");
 
 			// TODO: Really should convert all this into a resource / POJO

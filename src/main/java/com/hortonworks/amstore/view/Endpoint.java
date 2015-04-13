@@ -18,14 +18,14 @@
 package com.hortonworks.amstore.view;
 
 public abstract class Endpoint {
-	String url = "";
+	String endpointUrl = "";
 	String username = "";
 	String password = "";
 
-	public Endpoint(String url, String username,
+	public Endpoint(String endpointUrl, String username,
 			String password) {
 
-		this.url = url;
+		this.endpointUrl = endpointUrl;
 		this.username = username;
 		this.password = password;
 	}
@@ -33,11 +33,11 @@ public abstract class Endpoint {
 	public abstract boolean isAvailable();
 
 	public String getUrl() {
-		return url;
+		return endpointUrl;
 	}
 
 	public void setUrl(String url) {
-		this.url = url;
+		this.endpointUrl = url;
 	}
 
 	public String getUsername() {

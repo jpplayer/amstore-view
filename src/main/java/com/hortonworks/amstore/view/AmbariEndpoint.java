@@ -21,6 +21,7 @@ package com.hortonworks.amstore.view;
 import java.io.IOException;
 import java.util.Collection;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
@@ -42,6 +43,7 @@ public class AmbariEndpoint extends Endpoint {
 
 	protected String clusterName;
 	protected ViewContext viewContext;
+	protected ServicesConfiguration servicesConfiguration;
 
 	public AmbariEndpoint(ViewContext viewContext, String url, String username,
 			String password) {
@@ -54,16 +56,16 @@ public class AmbariEndpoint extends Endpoint {
 	@Override
 	public void setUrl(String url) {
 		if (url == null)
-			this.url = "";
+			this.endpointUrl = "";
 		// Remove any trailing slashes
 		if (url.endsWith("/")) {
-			this.url = url.substring(0, url.length() - 1);
+			this.endpointUrl = url.substring(0, url.length() - 1);
 		}
 	}
 
 	public String getClusterApiEndpoint() {
 		try {
-			return url + "/api/v1/clusters/" + getClusterName();
+			return getUrl() + "/api/v1/clusters/" + getClusterName();
 		} catch (IOException e) {
 			return null;
 		}
@@ -79,7 +81,7 @@ public class AmbariEndpoint extends Endpoint {
 
 	// This is only true because we ignore the clusterName
 	public boolean equals(AmbariEndpoint other) {
-		return this.url.equals(other.url)
+		return this.getUrl().equals(other.getUrl())
 				&& this.username.equals(other.username)
 				&& this.password.equals(other.password);
 	}
@@ -130,7 +132,7 @@ public class AmbariEndpoint extends Endpoint {
 	}
 
 	protected String netgetClusterName() throws IOException {
-		JSONObject clusterpage = AmbariStoreHelper.readJsonFromUrl(url
+		JSONObject clusterpage = AmbariStoreHelper.readJsonFromUrl(getUrl()
 				+ "/api/v1/clusters", username, password);
 		JSONArray clusters = clusterpage.getJSONArray("items");
 		if (clusters.length() == 0) {
@@ -241,44 +243,164 @@ public class AmbariEndpoint extends Endpoint {
 		AmbariStoreHelper.doDelete(this.viewContext.getURLStreamProvider(),
 				this, url);
 	}
-	
+
 	// Only makes sense in the context of an non-Views Ambari
 	// WARNING: NOT FUNCTIONAL, missing version.
-	public Map<String, StoreApplicationService> getInstalledServices() throws IOException {
-		Map<String, StoreApplicationService> installedApplications = new TreeMap<String, StoreApplicationService>();
+	/*
+	 * public Map<String, StoreApplicationService> getInstalledServices() throws
+	 * IOException { Map<String, StoreApplicationService> installedApplications
+	 * = new TreeMap<String, StoreApplicationService>();
+	 * 
+	 * String servicesUrl = getClusterApiEndpoint() + "/services";
+	 * AmbariStoreHelper h = new AmbariStoreHelper();
+	 * 
+	 * JSONObject servicesJson = AmbariStoreHelper.readJsonFromUrl(servicesUrl,
+	 * username, password); JSONArray items = h._a(servicesJson, "items");
+	 * 
+	 * for (int j = 0; j < items.length(); j++) { JSONObject serviceInfo =
+	 * h._o(items.getJSONObject(j), "ServiceInfo"); String serviceName =
+	 * h._s(serviceInfo, "service_name"); // TODO: get the version, then call
+	 * Store to get corresponding application.
+	 * //installedApplications.put(serviceName,
+	 * newStoreApplicationService(serviceName)); }
+	 * 
+	 * return installedApplications; }
+	 */
 
-		String servicesUrl = getClusterApiEndpoint() + "/services";
-		AmbariStoreHelper h = new AmbariStoreHelper();
-		
-		JSONObject servicesJson = AmbariStoreHelper.readJsonFromUrl(servicesUrl, username, password);
-		JSONArray items = h._a(servicesJson, "items");
-		
-		for (int j = 0; j < items.length(); j++) {
-			JSONObject serviceInfo = h._o(items.getJSONObject(j), "ServiceInfo");
-			String serviceName = h._s(serviceInfo,  "service_name");
-			// TODO: get the version, then call Store to get corresponding application.
-			//installedApplications.put(serviceName, newStoreApplicationService(serviceName));
-		}
-
-		return installedApplications;
-	}
-	
+	// Indexed by serviceName
 	public Set<String> getListInstalledServiceNames() throws IOException {
 		Set<String> serviceNames = new HashSet<String>();
 
 		String servicesUrl = getClusterApiEndpoint() + "/services";
 		AmbariStoreHelper h = new AmbariStoreHelper();
-		
-		JSONObject servicesJson = AmbariStoreHelper.readJsonFromUrl(servicesUrl, username, password);
+
+		JSONObject servicesJson = AmbariStoreHelper.readJsonFromUrl(
+				servicesUrl, username, password);
 		JSONArray items = h._a(servicesJson, "items");
-		
+
 		for (int j = 0; j < items.length(); j++) {
-			JSONObject serviceInfo = h._o(items.getJSONObject(j), "ServiceInfo");
-			String serviceName = h._s(serviceInfo,  "service_name");
+			JSONObject serviceInfo = h
+					._o(items.getJSONObject(j), "ServiceInfo");
+			String serviceName = h._s(serviceInfo, "service_name");
 			serviceNames.add(serviceName);
 		}
 		return serviceNames;
 	}
 
+	public class ServiceConfiguration {
+		Map<String, String> configuration = new TreeMap<String, String>();
 
-}
+		public ServiceConfiguration() {
+		}
+
+		public String get(String key) {
+			return configuration.get(key);
+		}
+
+		public void set(String key, String value) {
+			if (key == null)
+				throw new RuntimeException(
+						"Call to ServiceConfiguration with null key");
+			if (value == null)
+				throw new RuntimeException(
+						"Call to ServiceConfiguration with null value");
+			configuration.put(key, value);
+		}
+		
+		public Map<String, String> getMap(){
+			return configuration;
+		}
+
+	}
+
+	public class ServicesConfiguration {
+		Map<String, ServiceConfiguration> clusterConfiguration = new TreeMap<String, ServiceConfiguration>();
+
+		public ServicesConfiguration() {
+		}
+
+		public ServiceConfiguration get(String key) {
+			return clusterConfiguration.get(key);
+		}
+
+		public void set(String key, ServiceConfiguration value) {
+			clusterConfiguration.put(key, value);
+		}
+		
+		public Map<String, ServiceConfiguration> getMap(){
+			return clusterConfiguration;
+		}
+
+	}
+
+	public ServicesConfiguration getServicesConfiguration()
+			throws IOException {
+		if ( servicesConfiguration == null ) {
+			servicesConfiguration = netgetServicesConfiguration();
+		}
+		return servicesConfiguration;
+			
+	}
+	
+	protected ServicesConfiguration netgetServicesConfiguration()
+			throws IOException {
+		ServicesConfiguration servicesConfiguration = new ServicesConfiguration();
+
+//		AmbariStoreHelper h = new AmbariStoreHelper();
+
+		// Populate all settings
+		String url = this.getClusterApiEndpoint()
+				+ "?fields=Clusters/desired_configs";
+
+		JSONObject configResponse = AmbariStoreHelper.readJsonFromUrl(url,
+				username, password);
+//		JSONObject configIndex = h._o(configResponse, "Clusters");
+//		JSONObject configurations = h._o(configIndex, "desired_configs");
+		
+		JSONObject desiredConfigs = configResponse
+				.getJSONObject("Clusters")
+				.getJSONObject("desired_configs");
+		Iterator<?> keys = desiredConfigs.keys();
+		while (keys.hasNext()) {
+			String key = (String) keys.next();
+
+				if (desiredConfigs.get(key) instanceof JSONObject) {
+					String configType = key;
+					String tag = ((JSONObject) desiredConfigs.get(key)).getString("tag");
+					ServiceConfiguration serviceConfiguration = netgetServiceConfiguration(
+							configType, tag);
+					servicesConfiguration.set(key, serviceConfiguration);
+				}
+		}
+		return servicesConfiguration;
+	}
+
+	protected ServiceConfiguration netgetServiceConfiguration(
+			String configType, String tag) throws IOException {
+
+		ServiceConfiguration serviceConfiguration = new ServiceConfiguration();
+
+		// http://lake01.cloud.hortonworks.com:8080/api/v1/clusters/LAKE/configurations?type=capacity-scheduler&tag=version1423613079534
+		String url = this.getClusterApiEndpoint() + "/configurations?type="
+				+ configType + "&tag=" + tag;
+
+		JSONObject configResponse = AmbariStoreHelper.readJsonFromUrl(url,
+				username, password);
+		JSONObject properties = null;
+		try { 
+			properties = configResponse.getJSONArray("items")
+				.getJSONObject(0).getJSONObject("properties");
+		} catch(org.json.JSONException e){
+			return serviceConfiguration;
+		}
+
+		Iterator<?> keys = properties.keys();
+
+		while (keys.hasNext()) {
+			String key = (String) keys.next();
+			String value = properties.getString(key);
+			serviceConfiguration.set(key, value);
+		}
+		return serviceConfiguration;
+	}
+} // end class

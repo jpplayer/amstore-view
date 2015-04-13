@@ -156,28 +156,32 @@ public class StoreApplicationService extends StoreApplication {
 	@Override
 	public void doInstallStage2(AmbariEndpoint ambari, boolean reinstall)
 			throws IOException, StoreException {
-		// TODO: suggest to user to install service. Maybe offer some defaults
-		// and get it done.
+		// Check that the service is installed
+		if( ambari.getListInstalledServiceNames().contains( getServiceName() )){
+			throw new StoreException("Info: Service not yet installed. Cannot proceed.", CODE.INFO);
+		}
+		// Kick off automated installation if requested.
+		//ambari.createServiceInstance( this );
 	}
 
 	@Override
 	public void doUpdateStage1(StoreApplication newApplication)
 			throws IOException {
 		// TODO Auto-generated method stub
-		throw new NotImplementedException("doUpdateStage1 not implemented");
+		throw new NotImplementedException("Updating a service not implemented");
 	}
 
 	@Override
 	public void doUpdateStage2(AmbariEndpoint ambari,
 			StoreApplication newApplication) throws IOException {
 		// TODO Auto-generated method stub
-		throw new NotImplementedException("doUpdateStage2 not implemented");
+		throw new NotImplementedException("Updating a service not implemented");
 	}
 
 	@Override
 	public void doUninstallStage1() throws IOException {
 		// TODO Auto-generated method stub
-		throw new NotImplementedException("doUninstallStage1 not implemented");
+		throw new NotImplementedException("Uninstalling a service not implemented");
 
 		// Remove packages from disk on all nodes
 

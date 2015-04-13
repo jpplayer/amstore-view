@@ -133,7 +133,7 @@ public class AmbariStoreHelper {
 		headers.put("X-Requested-By", "view-ambari-store");
 		proxy.setCustomHeaders(headers);
 
-		return proxy.request(ambari.url + url).setData(data).put().asJSON();
+		return proxy.request(ambari.getUrl() + url).setData(data).put().asJSON();
 
 	}
 
@@ -148,7 +148,7 @@ public class AmbariStoreHelper {
 		headers.put("X-Requested-By", "view-ambari-store");
 		proxy.setCustomHeaders(headers);
 
-		return proxy.request(ambari.url + url).setData(data).put().asString();
+		return proxy.request(ambari.getUrl() + url).setData(data).put().asString();
 	}
 
 	// TODO: rewrite this in a dynamic graphical manner
@@ -180,7 +180,7 @@ public class AmbariStoreHelper {
 		headers.put("X-Requested-By", "view-ambari-store");
 		proxy.setCustomHeaders(headers);
 
-		return proxy.request(ambari.url + url).setData(data).post().asJSON();
+		return proxy.request(ambari.getUrl() + url).setData(data).post().asJSON();
 	}
 
 	public static String doPost(URLStreamProvider urlStreamProvider,
@@ -195,7 +195,7 @@ public class AmbariStoreHelper {
 		headers.put("X-Requested-By", "view-ambari-store");
 		proxy.setCustomHeaders(headers);
 
-		return proxy.request(ambari.url + url).setData(data).post().asString();
+		return proxy.request(ambari.getUrl() + url).setData(data).post().asString();
 	}
 
 	public static String doDelete(URLStreamProvider urlStreamProvider,
@@ -209,7 +209,7 @@ public class AmbariStoreHelper {
 		headers.put("X-Requested-By", "view-ambari-store");
 		proxy.setCustomHeaders(headers);
 
-		return proxy.request(ambari.url + url).delete().asString();
+		return proxy.request(ambari.getUrl() + url).delete().asString();
 	}
 
 	public static String jsonRequestToString(String json, String url) {
