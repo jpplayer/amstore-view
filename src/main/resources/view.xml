@@ -16,7 +16,7 @@ limitations under the License. Kerberos, LDAP, Custom. Binary/Htt
 -->
 <view>
   <name>AMBARI-STORE</name>
-  <version>0.1.2</version>
+  <version>0.1.4</version>
   <view-class>com.hortonworks.amstore.view.StoreManager</view-class>
  
   <resource>
