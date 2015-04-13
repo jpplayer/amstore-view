@@ -17,7 +17,7 @@
 
 	<groupId>com.hortonworks.amstore</groupId>
 	<artifactId>ambari-store</artifactId>
-	<version>0.1.2</version>
+	<version>0.1.4</version>
 
 	<properties>
 		<ambari.version>1.7.0.0</ambari.version>
