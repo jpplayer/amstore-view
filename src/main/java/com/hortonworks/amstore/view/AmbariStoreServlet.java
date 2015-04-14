@@ -376,10 +376,16 @@ public class AmbariStoreServlet extends HttpServlet {
 			writer.println("</td>");
 
 			writer.println("<td>");
+			try {
 			if (installedApplications.containsKey(app.getCanonicalName())
-					&& !installedApplications.get(app.getCanonicalName())
-							.getVersion().equals(app.getVersion())) {
+					&& installedApplications
+						.get(app.getCanonicalName())
+						.compareTo(app)
+						 < 0 ) {
 				writer.println("update");
+			}
+			} catch (Exception ex) {
+				// Update not implemented
 			}
 			writer.println("</td>");
 

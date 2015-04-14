@@ -20,6 +20,7 @@ package com.hortonworks.amstore.view;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.List;
 
 import org.apache.ambari.view.ViewContext;
 import org.apache.commons.io.FileUtils;
@@ -60,6 +61,7 @@ public class StoreApplicationService extends StoreApplication {
 		serviceFolderName = h._s(app, "service_folder_name");
 	}
 
+	
 	/*
 	 * (non-Javadoc)
 	 * 
@@ -196,4 +198,5 @@ public class StoreApplicationService extends StoreApplication {
 	public String getCanonicalName() {
 		return "service-" + getServiceName();
 	}
+
 }

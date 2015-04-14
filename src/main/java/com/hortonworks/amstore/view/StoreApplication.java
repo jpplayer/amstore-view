@@ -21,6 +21,7 @@ package com.hortonworks.amstore.view;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.Comparator;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.List;
@@ -37,7 +38,10 @@ import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public abstract class StoreApplication {
+public abstract class StoreApplication implements 
+	Comparator<StoreApplication>,
+	Comparable<StoreApplication>
+{
 	private final static Logger LOG = LoggerFactory
 			.getLogger(StoreApplication.class);
 	// Global
@@ -326,5 +330,28 @@ public abstract class StoreApplication {
 		String workDirectory = getPackageWorkdir();
 		FileUtils.deleteDirectory(new File(workDirectory));
 	}
+	public int compareVersions(String a, String b){
+		
+		String[] adots = a.split("\\.",2);
+		String[] bdots = b.split("\\.",2);
+		if( adots[0].equals(bdots[0])) {
+			if( adots.length == 1 && bdots.length == 1) return 0;
+			if( adots.length == 1 ) return -1;
+			if( bdots.length == 1 ) return 1;
+			return compareVersions(adots[1], bdots[1]);
+		}
+		
+		return new Integer(adots[0]) - new Integer(bdots[0]);
+	}
+	
+	// Applications are compared on versions
+	public int compare(StoreApplication a, StoreApplication b) {
+		return compareVersions( a.getVersion(), b.getVersion());
+	}		
+
+	public int compareTo(StoreApplication o) {
+		return compare(this,o);
+	}
+
 
 }

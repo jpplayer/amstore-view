@@ -61,7 +61,7 @@ public class AmbariStoreHelper {
 	
 	public AmbariStoreHelper() {
 	}
-
+	
 	@SuppressWarnings("restriction")
 	public static String readStringFromUrl(String url, String username,
 			String password) throws IOException {
