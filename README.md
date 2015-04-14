@@ -20,7 +20,20 @@ The *Ambari Store View* provides access to a collection of Views and Services.
 
 ## Pre-built Installer
 
+This installer also includes amstore-daemon to facilate restarts:
 curl http://ec2-54-184-106-70.us-west-2.compute.amazonaws.com/amstore/install_store.sh | sh
+
+## Manual installation
+
+git clone https://github.com/jpplayer/amstore-daemon.git
+cd amstore-daemon && sh build.sh && sh install.sh
+/usr/local/bin/amstore-daemon.sh start
+
+cd /var/lib/ambari-server/resources/views
+curl -O http://ec2-54-184-106-70.us-west-2.compute.amazonaws.com/amstore/ambari-store-0.1.4.jar
+ambari-server restart
+
+Login to Ambari then instanciate the Ambari Store view.
 
 ## Documentation
 
