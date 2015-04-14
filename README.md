@@ -41,11 +41,12 @@ Installing views requires a restart of the Ambari server. This is facilitated by
 REST service (amstore-daemon). The daemon will be removed once restarts are no longer needed.
 
 Instructions to install a view:
-# Select the view
-# Click "Install Selected". This will download the package to the server. No feedback is currently provided, please be patient.
-# Click "Restart Ambari"
-# Refresh your browser when instructed, and re-login
-# Navigate to the *Ambari Store* view and click "Finish installations"
+
+1. Select the view
+1. Click "Install Selected". This will download the package to the server. No feedback is currently provided, please be patient.
+1. Click "Restart Ambari"
+1. Refresh your browser when instructed, and re-login
+1. Navigate to the *Ambari Store* view and click "Finish installations"
 
 ## Limitations
 Only VIEWS are supported in this release. SERVICES will be supported in a future release.
@@ -59,12 +60,6 @@ Not all operations function well, in particular *updates* are not working proper
 
  sh ./build.sh
 
-## Install
-  
- sh ./install.sh 
-
- Follow the on-screen instructions.
-  
 ######Requirements
 * JDK 1.6
 * Maven 3.0
@@ -85,5 +80,13 @@ Not all operations function well, in particular *updates* are not working proper
   * -Dtest=\<TESTCLASSNAME>,\<TESTCLASSNAME#METHODNAME>,....
   * -Dtest.exclude=\<TESTCLASSNAME>
   * -Dtest.exclude.pattern=\*\*/\<TESTCLASSNAME1>.java,\*\*/\<TESTCLASSNAME2>.java
+
+
+## Install
+  
+ sh ./install.sh 
+
+ Follow the on-screen instructions.
+  
 
 
