@@ -53,6 +53,7 @@ public class StoreApplicationFactory {
 		return new StoreApplicationView(viewInstanceDefinition);
 	}
 
+
 	// TODO: really bare bones until we can access the installed version
 	public  StoreApplicationService getBareboneStoreApplicationService ( String serviceName ) {
 		return new StoreApplicationService( serviceName );

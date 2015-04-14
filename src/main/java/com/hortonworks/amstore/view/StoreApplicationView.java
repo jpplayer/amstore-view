@@ -124,7 +124,7 @@ public class StoreApplicationView extends StoreApplication {
 
 	// TODO: WARNING: Desired properties should already be set.
 	@Override
-	public void doInstallStage2(AmbariEndpoint ambari, boolean reinstall)
+	public void doInstallStage2(AmbariEndpoint localAmbari, boolean reinstall)
 	throws IOException, StoreException {
 		/*
 		 * Check whether we can install. If the package has not yet been
@@ -137,9 +137,9 @@ public class StoreApplicationView extends StoreApplication {
 			throw new StoreException("Application " + this.getInstanceDisplayName() + "not unpacked.\n", CODE.INFO);
 		}
 		if( reinstall )
-			ambari.updateViewInstance(this);
+			localAmbari.updateViewInstance(this);
 		else
-			ambari.createViewInstance(this);
+			localAmbari.createViewInstance(this);
 	}
 	
 	@Override
@@ -154,7 +154,7 @@ public class StoreApplicationView extends StoreApplication {
 
 	// TODO: WARNING. desiredMappedProperties must be set. Refactor this.
 	@Override
-	public void doUpdateStage2(AmbariEndpoint ambari, StoreApplication newApplication) throws IOException
+	public void doUpdateStage2(AmbariEndpoint localAmbari, StoreApplication newApplication) throws IOException
 	{
 		
 		
@@ -181,7 +181,7 @@ public class StoreApplicationView extends StoreApplication {
 
 
 			LOG.debug("creating view: " + newApplication.instanceName);
-			ambari.createViewInstance( (StoreApplicationView)newApplication);
+			localAmbari.createViewInstance( (StoreApplicationView)newApplication);
 
 			// delete any remaining files
 			this.deleteApplicationFiles();
@@ -189,15 +189,18 @@ public class StoreApplicationView extends StoreApplication {
 			// delete any old instance
 			// Exception: if we are updating the main store, could lead
 			// to odd behavior
-			ambari.deleteViewInstance( this );
+			localAmbari.deleteViewInstance( this );
 		}
 	}
 
 
 	@Override
-	public void doUninstallStage1() throws IOException {
-		// TODO Auto-generated method stub
-		throw new NotImplementedException("doUninstallStage1 not implemented");
+	public void doUninstallStage1(AmbariEndpoint localAmbari )
+			throws IOException, StoreException {
+		// delete view instance
+		localAmbari.deleteViewInstance( this );
+		// delete view files
+		deleteApplicationFiles();
 	}
 	
 	@Override

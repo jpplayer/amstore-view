@@ -22,6 +22,8 @@ import java.io.IOException;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
@@ -29,6 +31,7 @@ import java.util.TreeMap;
 import org.apache.ambari.view.URLStreamProvider;
 import org.apache.ambari.view.ViewContext;
 import org.apache.ambari.view.ViewInstanceDefinition;
+import org.apache.commons.lang.NotImplementedException;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import org.slf4j.Logger;
@@ -194,6 +197,118 @@ public class AmbariEndpoint extends Endpoint {
 		curlDelete(url);
 	}
 
+	public void startService(StoreApplicationService applicationService ){
+		String url = this.getClusterApiEndpoint() + "/services/" + applicationService.getServiceName();
+
+		String data = "{\"RequestInfo\": {\"context\" :\"Stop " + 
+				applicationService.getServiceName() + 
+				" via REST\"}, \"Body\": {\"ServiceInfo\": {\"state\": \"STARTED\"}}}";
+		
+		LOG.debug("Attempting to start: '" + url);
+		curlPut(url,data);
+	}
+	
+	public String stopService(StoreApplicationService applicationService ){
+		String url = this.getClusterApiEndpoint() + "/services/" + applicationService.getServiceName();
+
+		String data = "{\"RequestInfo\": {\"context\" :\"Stop " + 
+				applicationService.getServiceName() + 
+				" via REST\"}, \"Body\": {\"ServiceInfo\": {\"state\": \"INSTALLED\"}}}";
+		
+		LOG.debug("Attempting to stop: '" + url);
+		return curlPut(url,data);
+	}
+	
+	private void waitForCompletion(String response, int timeout) {
+		try {
+			JSONObject json = new JSONObject( response );
+			String url = json.getString("href") + "?fields=tasks/Tasks/*";
+			
+			boolean completed = false;
+			while( timeout >= 0 && ! completed ){
+				completed=true;
+				String tasklistjson = this.curlGet(url);
+				JSONArray tasks = new JSONObject(tasklistjson).getJSONArray("tasks");
+				for (int i = 0; i < tasks .length(); i++) {
+					String status = tasks.getJSONObject(i)
+							.getJSONObject("Tasks")
+							.getString("status");
+					if(! status.equals("COMPLETED") )
+						completed = false;
+				}
+				Thread.sleep(1000);  
+				timeout --;
+			}
+		} catch( IOException e ){
+		} catch (InterruptedException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}	
+		
+	}
+
+	public List<String> getServiceComponents(StoreApplicationService applicationService ) throws IOException {
+		List<String> componentUris = new LinkedList<String>();
+		String url = this.getClusterApiEndpoint() + 
+				"/services/" + 
+				applicationService.getServiceName() +
+				"/components";
+		JSONObject json = new JSONObject( curlGet(url) );
+		JSONArray items = json.getJSONArray("items");
+		for (int i = 0; i < items.length(); i++) {
+			componentUris.add(items.getJSONObject(i).getString("href"));
+		}
+		return componentUris;
+	}
+	public void deleteServiceComponent( String componentUri ){
+		curlDelete( componentUri );
+	}
+	
+	public void deleteServiceInstance(StoreApplicationService applicationService) {
+		String url = this.getClusterApiEndpoint() + 
+				"/services/" + 
+				applicationService.getServiceName();
+		curlDelete (url);
+	}
+
+
+	public void createService(StoreApplicationService applicationService) throws IOException {
+		throw new NotImplementedException("Not implemented: createService");
+		
+		// Create service itself
+		//createServiceInstance(applicationService);
+		
+		// Create all service components
+		
+		// Kick off installation
+		// requestServiceInstall( applicationService )
+		
+		// Start service
+		//startService( applicationService );
+
+	}
+
+	
+	public void deleteService(StoreApplicationService applicationService) throws IOException {
+
+		String response = null;
+		// Remove packages from disk on all nodes
+		// TODO
+
+		// Stop service
+		response = stopService( applicationService );
+		waitForCompletion( response, 30 );
+
+		// Delete all service components
+		List<String> components = getServiceComponents( applicationService );
+		for( String component: components ){
+			deleteServiceComponent( component );
+		}
+
+		// Delete service itself
+		deleteServiceInstance(applicationService);
+	}
+
 	/*
 	 * Makes a call to the local amstore-daemon. Will be obsolete once an ambari
 	 * restart is no longer required.
@@ -239,9 +354,20 @@ public class AmbariEndpoint extends Endpoint {
 			return true;
 	}
 
-	public void curlDelete(String url) throws ServiceFormattedException {
-		AmbariStoreHelper.doDelete(this.viewContext.getURLStreamProvider(),
+	public String curlDelete(String url) throws ServiceFormattedException {
+		return AmbariStoreHelper.doDelete(this.viewContext.getURLStreamProvider(),
 				this, url);
+	}
+	public String curlPost(String url, String data) throws ServiceFormattedException {
+		return AmbariStoreHelper.doPost(this.viewContext.getURLStreamProvider(),
+				this, url, data);
+	}
+	public String curlPut(String url, String data) throws ServiceFormattedException {
+		return AmbariStoreHelper.doPut(this.viewContext.getURLStreamProvider(),
+				this, url, data);
+	}
+	public String curlGet(String url) throws IOException {
+		return AmbariStoreHelper.readStringFromUrl(url, this.getUsername(), this.getPassword());
 	}
 
 	// Only makes sense in the context of an non-Views Ambari

@@ -43,12 +43,12 @@ public class StoreApplicationService extends StoreApplication {
 	String serviceFolderName = null;
 
 	// TODO: remove once we find a way to complete using at least version
-	public StoreApplicationService(String serviceName ){
+	public StoreApplicationService(String serviceName) {
 		super();
 		this.serviceName = serviceName;
 		setType("SERVICE");
 	}
-	
+
 	public StoreApplicationService(JSONObject app) {
 		super(app);
 
@@ -130,8 +130,7 @@ public class StoreApplicationService extends StoreApplication {
 			if (!file.isFile()) {
 				// How can we do this in a thread and provide download
 				// update ? TODO
-				AmbariStoreHelper
-						.downloadFile(getPackage_uri(), filePath);
+				AmbariStoreHelper.downloadFile(getPackage_uri(), filePath);
 			}
 			// Remove old folder and unpack into services folder
 			FileUtils.deleteDirectory(dir);
@@ -141,27 +140,32 @@ public class StoreApplicationService extends StoreApplication {
 	}
 
 	@Override
-	public void doInstallStage1(AmbariEndpoint localAmbari) throws IOException, StoreException {
+	public void doInstallStage1(AmbariEndpoint localAmbari) throws IOException,
+			StoreException {
 		downloadAndExtractPackage();
 
-		//check that local ambari is managing a cluster
+		// check that local ambari is managing a cluster
 		// If not, we cannot proceed to stage 2
-		if( ! localAmbari.isCluster() )
+		if (!localAmbari.isCluster())
 			throw new StoreException(
-					"Warning: cannot instanciate a service on an Ambari server that is not managing a cluster. The server at " 
-			+ localAmbari.getUrl() + " is not managing a cluster.\n", CODE.WARNING );
+					"Warning: cannot instanciate a service on an Ambari server that is not managing a cluster. The server at "
+							+ localAmbari.getUrl()
+							+ " is not managing a cluster.\n", CODE.WARNING);
 
 	}
 
 	@Override
-	public void doInstallStage2(AmbariEndpoint ambari, boolean reinstall)
+	public void doInstallStage2(AmbariEndpoint localAmbari, boolean reinstall)
 			throws IOException, StoreException {
 		// Check that the service is installed
-		if( ! ambari.getListInstalledServiceNames().contains( getServiceName() )){
-			throw new StoreException("Info: Service not yet installed. Cannot proceed.", CODE.INFO);
+		if (!localAmbari.getListInstalledServiceNames().contains(
+				getServiceName())) {
+			throw new StoreException(
+					"Info: Service not yet installed. Cannot proceed.",
+					CODE.INFO);
 		}
 		// Kick off automated installation if requested.
-		//ambari.createServiceInstance( this );
+		// ambari.createServiceInstance( this );
 	}
 
 	@Override
@@ -172,25 +176,24 @@ public class StoreApplicationService extends StoreApplication {
 	}
 
 	@Override
-	public void doUpdateStage2(AmbariEndpoint ambari,
+	public void doUpdateStage2(AmbariEndpoint localAmbari,
 			StoreApplication newApplication) throws IOException {
 		// TODO Auto-generated method stub
 		throw new NotImplementedException("Updating a service not implemented");
 	}
 
 	@Override
-	public void doUninstallStage1() throws IOException {
-		// TODO Auto-generated method stub
-		throw new NotImplementedException("Uninstalling a service not implemented");
+	public void doUninstallStage1(AmbariEndpoint localAmbari)
+			throws IOException, StoreException {
 
-		// Remove packages from disk on all nodes
+		// delete service with all components
+		localAmbari.deleteService(this);
 
-		// Delete service
-
-		// Delete stack
+		// delete stack files
+		deleteApplicationFiles();
 	}
 
-	public String getCanonicalName(){
+	public String getCanonicalName() {
 		return "service-" + getServiceName();
 	}
 }

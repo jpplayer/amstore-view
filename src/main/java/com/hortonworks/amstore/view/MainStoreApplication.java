@@ -27,6 +27,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.hortonworks.amstore.view.AmbariEndpoint.ServicesConfiguration;
+import com.hortonworks.amstore.view.StoreException.CODE;
 import com.hortonworks.amstore.view.utils.ServiceFormattedException;
 
 public class MainStoreApplication extends StoreApplicationView {
@@ -50,6 +51,7 @@ public class MainStoreApplication extends StoreApplicationView {
 					.getResourceAsStream("store.properties");
 			properties.load(stream);
 
+			app_id = properties.getProperty("mainStoreAppId");
 			viewName = properties.getProperty("viewName");
 			version = properties.getProperty("version");
 			instanceName = properties.getProperty("instanceName");
@@ -128,10 +130,11 @@ public class MainStoreApplication extends StoreApplicationView {
 
 				// if e.getValue() needs replacing
 				String field = e.getValue();
-				if( field == null) {
+				if (field == null) {
 					// do nothing
 				} else if (field.startsWith("ambari.")) {
-					// Calls the store the first time. Keeping it here ensures it only
+					// Calls the store the first time. Keeping it here ensures
+					// it only
 					// gets called if we really have to. Not efficient.
 					ServicesConfiguration servicesConfiguration = getAmbariCluster()
 							.getServicesConfiguration();
@@ -234,6 +237,7 @@ public class MainStoreApplication extends StoreApplicationView {
 	}
 
 	// Indexed by canonicalName
+	// Note: The returned value is not fully instantiated
 	public Map<String, StoreApplicationView> getInstalledViews() {
 		Map<String, StoreApplicationView> installedApplications = new TreeMap<String, StoreApplicationView>();
 
@@ -250,6 +254,7 @@ public class MainStoreApplication extends StoreApplicationView {
 
 	// TODO WARNING: we are only the service_name NOT version
 	// Indexed by canonicalName
+	// Note: The returned value is not fully instantiated
 	public Map<String, StoreApplicationService> getInstalledServices()
 			throws IOException {
 		Map<String, StoreApplicationService> installedServices = new TreeMap<String, StoreApplicationService>();
@@ -267,118 +272,162 @@ public class MainStoreApplication extends StoreApplicationView {
 		return installedServices;
 	}
 
+	// Indexed by canonicalName
 	public Map<String, StoreApplication> getInstalledApplications()
 			throws IOException {
-		Map<String, StoreApplication> applications = new TreeMap<String, StoreApplication>();
+		Map<String, StoreApplication> applicationStubs = new TreeMap<String, StoreApplication>();
 
 		// Add Views
 		for (Entry<String, StoreApplicationView> e : getInstalledViews()
 				.entrySet()) {
-			applications.put(e.getKey(), e.getValue());
+			applicationStubs.put(e.getKey(), e.getValue());
 		}
 		// Add Services
 		for (Entry<String, StoreApplicationService> e : getInstalledServices()
 				.entrySet()) {
-			applications.put(e.getKey(), e.getValue());
+			applicationStubs.put(e.getKey(), e.getValue());
 		}
 		// Add assemblies
 		// TODO
 
-		return applications;
+		return applicationStubs;
 	}
 
-	public StoreApplication getInstalledApplicationByAppId(String appId) {
+	// Fully populated
+	public StoreApplication getInstalledApplicationByAppId(String appId)
+			throws StoreException {
+		/*
+		 * Get the latest version We can do this because there should always be
+		 * at least one version available even if it's a later version than the
+		 * one installed.
+		 */
 		// Efficient
-		StoreApplication app = getStoreEndpoint().getAllApplicationsFromStore()
-				.get(appId);
+		StoreApplication latestAppAvailable = getStoreEndpoint()
+				.getAllApplicationsFromStore().get(appId);
+
+		if (latestAppAvailable == null) {
+			throw new StoreException(
+					"Application "
+							+ appId
+							+ " was not found in the Store. If this app is not managed by the store it cannot be deleted via the store.");
+		}
+
+		if (latestAppAvailable.isView()) {
+			ViewInstanceDefinition instance = getInstalledViewInstanceByCanonicalName(
+					latestAppAvailable.getCanonicalName()
+					);
+
+			StoreApplicationView storeApplicationView = (StoreApplicationView)
+					this
+					.getStoreEndpoint()
+					.netgetApplicationFromStoreByAppId(appId, instance.getViewDefinition().getVersion());
+			
+			// if we get here the application was not found.
+			if( storeApplicationView == null )
+			throw new StoreException(
+					"Application "
+							+ appId
+							+ " with version "
+							+ instance.getViewDefinition().getVersion()
+							+ " was not found in the Store. Cannot delete information on disk.");
+			return storeApplicationView;
+		} else if (latestAppAvailable.isService()) {
+			// We don't handle versions, so return the latest
+			return latestAppAvailable;
+		}
+		throw new NotImplementedException(
+				"Only Views and Services are supported.");
+	}
+
+	/*
+	public StoreApplication getInstalledApplicationByAppId(String appId)
+			throws IOException, StoreException {
+
+		// Efficient
+		StoreApplication latestAppAvailable = getStoreEndpoint()
+				.getAllApplicationsFromStore().get(appId);
+
+		if (latestAppAvailable == null) {
+			throw new StoreException(
+					"Application "
+							+ appId
+							+ " was not found in the Store. If this app is not managed by the store it cannot be deleted via the store.");
+		}
+		// Get the installed version
+		StoreApplication installedApplicationStub = this
+				.getInstalledApplicationByCanonicalName(latestAppAvailable
+						.getCanonicalName());
+		if (installedApplication == null) {
+
+			if (latestAppAvailable.isView()) {
+
+				ViewInstanceDefinition instance = this.getInstancedViews().get(
+						latestAppAvailable.getInstanceName());
+				throw new StoreException(
+						"Application "
+								+ appId
+								+ " with version "
+								+ instance.getViewDefinition().getVersion()
+								+ " was not found in the Store. Cannot delete information on disk.");
+			}
+		}
+
+		return installedApplication;
+
+	}
+*/
+	public ViewInstanceDefinition getInstalledViewInstanceByCanonicalName(
+			String canonicalName) {
 
 		Collection<ViewInstanceDefinition> viewDefinitions = getViewContext()
 				.getViewInstanceDefinitions();
 		for (ViewInstanceDefinition instance : viewDefinitions) {
-			if (instance.getInstanceName().equals(app.getInstanceName())) {
-				return storeEndpoint.netgetApplicationFromStoreByAppId(appId,
-						instance.getViewDefinition().getVersion());
+			String canonical = "view-" + 
+					instance.getViewDefinition().getViewName() +
+					"-" +
+					instance.getInstanceName();
+			if (canonical.equals(canonicalName)) {
+				return instance;
 			}
 		}
 		return null;
 	}
 
-	public void deleteApplication(String appId) {
+	// TODO: Move into mainStoreApplication when feedback can be provided
+	// dynamically
+	public void installApplication(String appId) throws StoreException {
+		LOG.debug("Starting downloads.");
 
-		// Get the installed version first
-		StoreApplication installedApplication = this
-				.getInstalledApplicationByAppId(appId);
-
-		String url = "";
-
-		if (installedApplication == null) {
-			LOG.warn("Delete request for " + appId
-					+ " failed: Application not found.");
-			return;
+		Map<String, StoreApplication> availableApplications = getStoreEndpoint()
+				.getAllApplicationsFromStore();
+		StoreApplication app = availableApplications.get(appId);
+		try {
+			app.doInstallStage1(getAmbariLocal());
+		} catch (IOException e) {
+			LOG.warn("IOException downloading application:" + appId);
 		}
-
-		// Note: we must get the information about this exact version, not any
-		// new version that might show up on the app store.
-		url = "/api/v1/views/" + installedApplication.getViewName()
-				+ "/versions/" + installedApplication.getVersion()
-				+ "/instances/" + installedApplication.getInstanceName();
-
-		LOG.debug("Attempting to delete: '" + url);
-		AmbariStoreHelper.doDelete(this.viewContext.getURLStreamProvider(),
-				this.ambariViews, url);
+		addPostInstallTask(app.uri);
 	}
 
-	// TODO: make this more efficient
 	/*
 	 * Removes the associated files of an instance. Requires a restart to
 	 * complete. Assert: the view must be instantiated TODO: Refuses to
 	 * uninstall the App Store itself. Need a better way.
 	 */
-	public void uninstallApplication(String appId) throws IOException {
-
-		// Get the latest version
-		StoreApplication latestAppAvailable = getStoreEndpoint()
-				.getAllApplicationsFromStore().get(appId);
-
-		if (latestAppAvailable == null) {
-			LOG.warn("Application "
-					+ appId
-					+ " was not found in the Store. If this app is not managed by the store it cannot be deleted via the store.");
-			return;
-		}
-		// Get the installed version
+	public void uninstallApplication(String appId) throws IOException,
+			StoreException {
 		StoreApplication installedApplication = this
 				.getInstalledApplicationByAppId(appId);
-		if (installedApplication == null) {
-			try {
-				ViewInstanceDefinition instance = this.getInstancedViews().get(
-						latestAppAvailable.getInstanceName());
-				LOG.warn("Application "
-						+ appId
-						+ " with version "
-						+ instance.getViewDefinition().getVersion()
-						+ " was not found in the Store. Cannot delete information on disk.");
-			} catch (Exception e) {
-				LOG.warn("Erroro trying to uninstall application " + appId);
-			}
-			return;
-		}
+		if (installedApplication == null)
+			throw new StoreException("Application " + appId
+					+ "must be installed first. Cannot uninstall.", CODE.INFO);
 
 		// Do not delete Store
 		if (installedApplication.isStore()) {
-			LOG.warn("Attempted to uninstall store. Not supported.");
-			return;
+			throw new StoreException(
+					"Attempted to uninstall store. Not supported.", CODE.INFO);
 		}
-		installedApplication.deleteApplicationFiles();
-
-		// We don't need the viewInstance anymore so we delete it now
-		deleteApplication(appId);
-		/*
-		 * TODO
-		 * 
-		 * WE NEED TO RESTART TWICE Once to clear any remnants of instance data
-		 * The other to unpack the view.
-		 */
+		installedApplication.doUninstallStage1(this.getAmbariLocal());
 	}
 
 	public void updateApplication(String appId) throws IOException,
@@ -420,20 +469,30 @@ public class MainStoreApplication extends StoreApplicationView {
 		addPostUpdateTask(newApplication.uri);
 	}
 
-	// TODO: Move into mainStoreApplication when feedback can be provided
-	// dynamically
-	public void installApplication(String appId) throws StoreException {
-		LOG.debug("Starting downloads.");
+	public void deleteApplication(String appId) throws IOException,
+			StoreException {
 
-		Map<String, StoreApplication> availableApplications = getStoreEndpoint()
-				.getAllApplicationsFromStore();
-		StoreApplication app = availableApplications.get(appId);
-		try {
-			app.doInstallStage1(getAmbariLocal());
-		} catch (IOException e) {
-			LOG.warn("IOException downloading application:" + appId);
+		// Get the installed version first
+		StoreApplication installedApplication = this
+				.getInstalledApplicationByAppId(appId);
+
+		String url = "";
+
+		if (installedApplication == null) {
+			LOG.warn("Delete request for " + appId
+					+ " failed: Application not found.");
+			return;
 		}
-		addPostInstallTask(app.uri);
+
+		// Note: we must get the information about this exact version, not any
+		// new version that might show up on the app store.
+		url = "/api/v1/views/" + installedApplication.getViewName()
+				+ "/versions/" + installedApplication.getVersion()
+				+ "/instances/" + installedApplication.getInstanceName();
+
+		LOG.debug("Attempting to delete: '" + url);
+		AmbariStoreHelper.doDelete(this.viewContext.getURLStreamProvider(),
+				this.ambariViews, url);
 	}
 
 	/*
@@ -620,12 +679,15 @@ public class MainStoreApplication extends StoreApplicationView {
 					LOG.debug("Removing tasks from list.");
 					removePostInstallTask(uri);
 				} catch (ServiceFormattedException e) {
-					LOG.warn("ServiceFormattedException:" + e.toString());
+					exceptions.add(new StoreException(
+							"ServiceFormattedException:" + e.toString(),
+							CODE.WARNING));
+				} catch (IOException e) {
+					exceptions.add(new StoreException("IOException:"
+							+ e.toString(), CODE.WARNING));
 				} catch (StoreException e) {
 					LOG.warn("StoreException:" + e.toString());
 					exceptions.add(e);
-				} catch (IOException e) {
-					LOG.warn("IOException:" + e.toString());
 				}
 			} else if (application.isService()) {
 
@@ -634,12 +696,14 @@ public class MainStoreApplication extends StoreApplicationView {
 					application.doInstallStage2(getAmbariCluster(), false);
 					removePostInstallTask(uri);
 				} catch (ServiceFormattedException e) {
-					LOG.warn("ServiceFormattedException:" + e.toString());
+					exceptions.add(new StoreException(
+							"ServiceFormattedException:" + e.toString(),
+							CODE.WARNING));
 				} catch (StoreException e) {
-					LOG.warn("StoreExceptionw:" + e.toString());
 					exceptions.add(e);
 				} catch (IOException e) {
-					LOG.warn("IOException:" + e.toString());
+					exceptions.add(new StoreException("IOException:"
+							+ e.toString(), CODE.WARNING));
 				}
 
 			} else {

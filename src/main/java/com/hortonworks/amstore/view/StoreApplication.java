@@ -40,6 +40,9 @@ import org.slf4j.LoggerFactory;
 public abstract class StoreApplication {
 	private final static Logger LOG = LoggerFactory
 			.getLogger(StoreApplication.class);
+	// Global
+	protected static String mainStoreCanonicalName = null;
+
 	// protected
 	protected String id;
 	protected String app_id;
@@ -134,18 +137,30 @@ public abstract class StoreApplication {
 
 	public abstract String getPackageWorkdir();
 
-	public abstract void doInstallStage1(AmbariEndpoint localAmbari) throws IOException, StoreException;
+	public abstract void doInstallStage1(AmbariEndpoint localAmbari)
+			throws IOException, StoreException;
 
-	public abstract void doInstallStage2(AmbariEndpoint ambari,
+	/*
+	 * doInstallStage2 is called right after doInstallStage1 It should throw a
+	 * StoreException at INFO level if a package is missing due to Ambari not
+	 * being restarted.
+	 */
+	public abstract void doInstallStage2(AmbariEndpoint localAmbari,
 			boolean reinstall) throws IOException, StoreException;
 
 	public abstract void doUpdateStage1(StoreApplication newApplication)
 			throws IOException, StoreException;
 
-	public abstract void doUpdateStage2(AmbariEndpoint ambari,
+	/*
+	 * doUpdateStage2 is called right after doUpdateStage1 It should throw a
+	 * StoreException at INFO level if a package is missing due to Ambari not
+	 * being restarted.
+	 */
+	public abstract void doUpdateStage2(AmbariEndpoint localAmbari,
 			StoreApplication newApplication) throws IOException, StoreException;
 
-	public abstract void doUninstallStage1() throws IOException, StoreException;
+	public abstract void doUninstallStage1(AmbariEndpoint localAmbari)
+			throws IOException, StoreException;
 
 	/*
 	 * This method is used to quickly lookup an installed application (without
@@ -154,22 +169,31 @@ public abstract class StoreApplication {
 	 */
 	public abstract String getCanonicalName();
 
+	// Only used for isStore()
+	private String getMainStoreCanonicalName() {
+		if (mainStoreCanonicalName == null) {
+			Properties properties = new Properties();
+			InputStream stream = getClass().getClassLoader()
+					.getResourceAsStream("store.properties");
+			try {
+				properties.load(stream);
+				mainStoreCanonicalName = "view-" + properties.getProperty("viewName") + "-" + properties.getProperty("instanceName");
+			} catch (IOException e) {
+				throw new RuntimeException(
+						"Error reading property file store.properties.");
+			}
+		}
+		return mainStoreCanonicalName;
+
+	}
+
 	// Returns true if this application represents the Ambari Store itself
 	// TODO: ensure the value is set correctly by the Factory, so we can simply
-	// overload
-	// correctly
+	// overload correctly
 	public boolean isStore() {
-		Properties properties = new Properties();
-		InputStream stream = getClass().getClassLoader().getResourceAsStream(
-				"store.properties");
-		try {
-			properties.load(stream);
-			String mainStoreAppId = properties.getProperty("mainStoreAppId");
-			return app_id.equals(mainStoreAppId);
-		} catch (IOException e) {
-			throw new RuntimeException(
-					"Error reading property file store.properties.");
-		}
+		if (getCanonicalName() == null)
+			throw new RuntimeException("Called isStore() with canonicalName null.");
+		return getCanonicalName().equals(getMainStoreCanonicalName());
 	}
 
 	public boolean isView() {

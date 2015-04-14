@@ -652,17 +652,17 @@ public class AmbariStoreServlet extends HttpServlet {
 
 	// deletes instance
 	// TODO: we ignore all exceptions
-	private List<StoreException> doDelete(String[] app_ids) {
+	private List<StoreException> doDelete(String[] app_ids) throws IOException {
 		List<StoreException> exceptions = new LinkedList<StoreException>();
 		if (app_ids == null || app_ids.length == 0)
 			return exceptions;
 		LOG.debug("Starting deletions.\n");
 		for (String app_id : app_ids) {
-			// try {
-			mainStoreApplication.deleteApplication(app_id);
-			// } catch(StoreException e){
-			// exceptions.add(e);
-			// }
+			 try {
+				 mainStoreApplication.deleteApplication(app_id);
+			 } catch(StoreException e){
+			 exceptions.add(e);
+			 }
 		}
 		return exceptions;
 	}
@@ -679,8 +679,8 @@ public class AmbariStoreServlet extends HttpServlet {
 				mainStoreApplication.uninstallApplication(app_id);
 			} catch (IOException e) {
 				// TODO: we ignore any issues
-				// } catch (StoreException e){
-
+			} catch (StoreException e){
+				exceptions.add(e);
 			}
 		}
 		return exceptions;
