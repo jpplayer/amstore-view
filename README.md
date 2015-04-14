@@ -35,6 +35,10 @@ curl http://ec2-54-184-106-70.us-west-2.compute.amazonaws.com/amstore/install_st
 ```
 Login to Ambari then instanciate the Ambari Store view.
 
+## Screenshot
+
+![Image](../master/package/storeview.jpg?raw=true)
+
 ## Documentation
 
 Provides an interface to manage Ambari Views. Supported operations:
