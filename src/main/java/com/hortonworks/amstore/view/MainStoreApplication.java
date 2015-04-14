@@ -313,10 +313,12 @@ public class MainStoreApplication extends StoreApplicationView {
 		}
 
 		if (latestAppAvailable.isView()) {
+			
 			ViewInstanceDefinition instance = getInstalledViewInstanceByCanonicalName(
 					latestAppAvailable.getCanonicalName()
 					);
-
+			if( instance == null )
+				return null;
 			StoreApplicationView storeApplicationView = (StoreApplicationView)
 					this
 					.getStoreEndpoint()

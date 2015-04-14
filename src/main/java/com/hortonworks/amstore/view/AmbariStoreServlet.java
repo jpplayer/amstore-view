@@ -110,7 +110,7 @@ public class AmbariStoreServlet extends HttpServlet {
 			}
 
 			displayAllApplications(request, response);
-			//displayInstalledServicesInformation();
+			// displayInstalledServicesInformation();
 
 		} catch (NullPointerException e) {
 			writer.println("NullPointerException caught.<br>");
@@ -277,13 +277,15 @@ public class AmbariStoreServlet extends HttpServlet {
 		writer.println("<tr></tr>");
 
 		try {
-		Map<String, String> mapped = mainStoreApplication
-				.getMappedProperties(app);
-		for (Entry<String, String> e : app.getBackendProperties().entrySet()) {
-			writer.println("<tr><td>" + e.getKey() + "</td><td>" + e.getValue()
-					+ "</td><td>" + mapped.get(e.getKey()) + "</td></tr>");
-		}
-		} catch (StoreException e){
+			Map<String, String> mapped = mainStoreApplication
+					.getMappedProperties(app);
+			for (Entry<String, String> e : app.getBackendProperties()
+					.entrySet()) {
+				writer.println("<tr><td>" + e.getKey() + "</td><td>"
+						+ e.getValue() + "</td><td>" + mapped.get(e.getKey())
+						+ "</td></tr>");
+			}
+		} catch (StoreException e) {
 			writer.println("<tr><td>Exception:" + e.getMessage() + "</td></tr>");
 		}
 		writer.println("</table>");
@@ -347,6 +349,7 @@ public class AmbariStoreServlet extends HttpServlet {
 
 		Map<String, StoreApplication> availableApplications = mainStoreApplication
 				.getStoreEndpoint().getAllApplicationsFromStore();
+
 		for (Map.Entry<String, StoreApplication> e : availableApplications
 				.entrySet()) {
 			StoreApplication app = e.getValue();
@@ -574,20 +577,21 @@ public class AmbariStoreServlet extends HttpServlet {
 		}
 		writer.println("</table>");
 	}
-	
+
 	// For debug
 	private void displayInstalledServicesInformation() throws IOException {
-		AmbariEndpoint.ServicesConfiguration servicesConfiguration = mainStoreApplication.getAmbariCluster()
-				.getServicesConfiguration();
+		AmbariEndpoint.ServicesConfiguration servicesConfiguration = mainStoreApplication
+				.getAmbariCluster().getServicesConfiguration();
 		writer.println("<table>");
 
-		for( Entry<String,AmbariEndpoint.ServiceConfiguration> s: servicesConfiguration.getMap().entrySet() ){
+		for (Entry<String, AmbariEndpoint.ServiceConfiguration> s : servicesConfiguration
+				.getMap().entrySet()) {
 			writer.println("<tr>");
 			writer.println("<td>" + s.getKey() + "</td>");
 			writer.println("<td>");
 
 			writer.println("<table>");
-			for( Entry<String,String> e: s.getValue().getMap().entrySet() ){
+			for (Entry<String, String> e : s.getValue().getMap().entrySet()) {
 				writer.println("<tr>");
 				writer.println("<td>" + e.getKey() + "</td>");
 				writer.println("<td>" + e.getValue() + "</td>");
@@ -601,16 +605,15 @@ public class AmbariStoreServlet extends HttpServlet {
 		}
 		writer.println("</table>");
 	}
-	
-
 
 	private void displayExceptions(List<StoreException> exceptions) {
-			for (StoreException e : exceptions) {
-				// Only display errors or warnings
-				if (e.getCode() == CODE.ERROR || e.getCode() == CODE.WARNING ) {
-					writer.println("<br><pre>" + "Exception:\n" + e.getMessage() + "</pre>");
-				}
+		for (StoreException e : exceptions) {
+			// Only display errors or warnings
+			if (e.getCode() == CODE.ERROR || e.getCode() == CODE.WARNING) {
+				writer.println("<br><pre>" + "Exception:\n" + e.getMessage()
+						+ "</pre>");
 			}
+		}
 	}
 
 	private List<StoreException> doInstallation(String[] app_ids) {
@@ -658,11 +661,11 @@ public class AmbariStoreServlet extends HttpServlet {
 			return exceptions;
 		LOG.debug("Starting deletions.\n");
 		for (String app_id : app_ids) {
-			 try {
-				 mainStoreApplication.deleteApplication(app_id);
-			 } catch(StoreException e){
-			 exceptions.add(e);
-			 }
+			try {
+				mainStoreApplication.deleteApplication(app_id);
+			} catch (StoreException e) {
+				exceptions.add(e);
+			}
 		}
 		return exceptions;
 	}
@@ -679,7 +682,7 @@ public class AmbariStoreServlet extends HttpServlet {
 				mainStoreApplication.uninstallApplication(app_id);
 			} catch (IOException e) {
 				// TODO: we ignore any issues
-			} catch (StoreException e){
+			} catch (StoreException e) {
 				exceptions.add(e);
 			}
 		}

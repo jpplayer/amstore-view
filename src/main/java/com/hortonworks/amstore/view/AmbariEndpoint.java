@@ -275,13 +275,23 @@ public class AmbariEndpoint extends Endpoint {
 	public void createService(StoreApplicationService applicationService) throws IOException {
 		throw new NotImplementedException("Not implemented: createService");
 		
-		// Create service itself
-		//createServiceInstance(applicationService);
+		// Create service 
+		// createServiceInstance(applicationService);
+		//  $CURL -H "X-Requested-By: $agent" --silent -X POST -d '[ { "ServiceInfo" : { "service_name": "STOREAGENT"	  } } ] ' http://localhost:8080/api/v1/clusters/$CLUSTER_NAME/services 
+		//curl -u admin:admin -X POST -H "X-Requested-By: ambari" http://localhost:8080/api/v1/clusters/$CLUSTER/services/SOLR
+
 		
 		// Create all service components
+		// $CURL -H "X-Requested-By: $agent" --silent -X POST  http://localhost:8080/api/v1/clusters/$CLUSTER_NAME/services/STOREAGENT/components/STORE_CLIENT
+		//curl -u admin:admin -X POST -H "X-Requested-By: ambari" http://localhost:8080/api/v1/clusters/$CLUSTER/services/SOLR/components/SOLR_MASTER
+
 		
-		// Kick off installation
+		// Create all Host components
+		//  $CURL -H "X-Requested-By: $agent" --silent -X POST http://localhost:8080/api/v1/clusters/$CLUSTER_NAME/hosts/$FQDN/host_components/STORE_CLIENT
+		
+		// Install all host components
 		// requestServiceInstall( applicationService )
+		//$CURL -H "X-Requested-By: $agent" --silent -X PUT -d '[ { "RequestInfo": { "context": "Install Store Agent Client" }, "Body" : { "ServiceInfo": { "state": "INSTALLED" }	  } } ] ' http://localhost:8080/api/v1/clusters/$CLUSTER_NAME/services/STOREAGENT 
 		
 		// Start service
 		//startService( applicationService );
