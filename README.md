@@ -66,7 +66,7 @@ Instructions to install a view:
 1. Navigate to the *Ambari Store* view and click "Finish installations"
 
 ## Limitations
-Install is supported for VIEWS, with support for downloading but not installing SERVICES.
+SERVICES can be downloaded, but unlike VIEWS, they must be manually installed using the "Add Service" wizard of Ambari.
 Not all operations function well, in particular *updates* are not working. 
 
 ## License
