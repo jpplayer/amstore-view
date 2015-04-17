@@ -16,7 +16,7 @@ limitations under the License.
 Ambari Store View
 ============
 
-The *Ambari Store View* provides access to a collection of Views and Services.
+The *Ambari Store View* provides access to a collection of Views and Services for Apache Ambari.
 
 ## Pre-built Installer
 
@@ -45,6 +45,8 @@ Provides an interface to manage Ambari Views. Supported operations:
 - Install
 - Update
 - Uninstall
+
+The Store view works with an Ambari Views Server, but in that case only VIEWS are supported, not SERVICES.
 
 Applications are automatically configured using the Store defaults. Supported endpoints:
 - WebHDFS
