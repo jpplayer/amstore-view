@@ -404,6 +404,7 @@ public class MainStoreApplication extends StoreApplicationView {
 				.getAllApplicationsFromStore();
 		StoreApplication app = availableApplications.get(appId);
 		try {
+			LOG.info("Starting download of application: " + app.getCanonicalName());
 			app.doInstallStage1(getAmbariLocal());
 		} catch (IOException e) {
 			LOG.warn("IOException downloading application:" + appId);
