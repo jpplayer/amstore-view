@@ -5,7 +5,8 @@ STACK=""
 FQDN=$(hostname -f)
 CLUSTER_NAME=""
 CURL='curl'
-CREDENTIALS="admin:admin" 
+USERNAME="admin"
+PASSWORD="admin"
 agent="store-installer"
 VERSION="0.1.4"
 USE_DEMO_SERVER=no
@@ -22,30 +23,25 @@ curl -u admin:admin -X POST -H "X-Requested-By: ambari" -d "${data}" http://loca
 
 
 function usage() {
-	cat << EOF
-Usage: install.sh <options>
-    -u <username>:<password>   Specify username and password for Ambari. Defaults to admin:admin.
 
-Example: ./install.sh -u operator:hadoop
-EOF
+echo '
+Usage: install.sh <options>
+    -u <username>   Specify username for Ambari. Defaults to admin.
+	-p <password>   Specify password for Ambari. Defaults to admin.
+Example: ./install.sh -u operator -p hadoop
+'
 }
 
-while getopts ":u:d" opt; do
+while getopts ":u:p:d" opt; do
 	case "$opt" in
-	u)
-		CREDENTIALS=${OPTARG}
-	;;
-	d)
-		USE_DEMO_SERVER=yes
-	;;
-	\?)
-		echo "Invalid option: -$OPTARG" >&2
-		usage
-		exit 1
-	;;
+	u)	USERNAME=${OPTARG};;
+	p)	PASSWORD=${OPTARG};;
+	d)	USE_DEMO_SERVER=yes;;
+	\?)	echo "Invalid option: -$OPTARG" >&2; usage; exit 1;;
 	esac
 done
 
+CREDENTIALS="$USERNAME:$PASSWORD" 
 CURL="$CURL -u $CREDENTIALS"
 
 function check_ambari(){
@@ -74,14 +70,19 @@ function get_cluster_name() {
 		echo "Error connecting to http://localhost:8080/api/v1/clusters $response"
 			exit 1
     fi
-  
-	
 }
 
 function create_instance() {
 
-$CURL -H "X-Requested-By: $agent" -X POST -d '[ { "ViewInstanceInfo" : { "label": "Ambari Store", "description": "Ambari Application Store"
-  } } ] ' "http://localhost:8080/api/v1/views/AMBARI-STORE/versions/${VERSION}/instances/store"
+data='[ { "ViewInstanceInfo" : { "label": "Ambari Store", "description": "Ambari Application Store",
+"properties": {
+	"amstore.ambari.local.username" : "_USERNAME_",
+	"amstore.ambari.local.password" : "_PASSWORD_"
+}
+  } } ] '
+data=$(  echo $data | sed "s/_USERNAME_/${USERNAME}/" )
+data=$(  echo $data | sed "s/_PASSWORD_/${PASSWORD}/" )
+$CURL -H "X-Requested-By: $agent" -X POST -d "${data}"  "http://localhost:8080/api/v1/views/AMBARI-STORE/versions/${VERSION}/instances/store"
 }
 
 function reconfigure_instance() {
