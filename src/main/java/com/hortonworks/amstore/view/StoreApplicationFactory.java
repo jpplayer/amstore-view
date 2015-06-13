@@ -20,6 +20,7 @@
 package com.hortonworks.amstore.view;
 
 import org.apache.ambari.view.ViewInstanceDefinition;
+import org.json.JSONException;
 import org.json.JSONObject;
 
 import com.hortonworks.amstore.view.utils.ServiceFormattedException;
@@ -37,7 +38,15 @@ public class StoreApplicationFactory {
 		StoreApplication storeApplication = null;
 		String type;
 	//		app = (JSONObject) json.get("application");
+
+		try {
 			type = app.getString("type");
+		} catch (JSONException e){
+			// TODO: bad coding. The method that calls this function will handle null applications but should be handled
+			// as an exception. This exception is really a warning (the application submitted to the store is missing a TYPE.
+			// Backend amstore, please keep your data clean !
+			return null;	
+		}
 			
 		if( type.equals("VIEW")) {
 			storeApplication = new StoreApplicationView(app );

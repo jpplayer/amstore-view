@@ -117,7 +117,8 @@ public class AmbariStoreServlet extends HttpServlet {
 			writer.println(GenericException.prettyTrace(e));
 
 		} catch (Exception e) {
-			writer.println("Catch All Exception: " + e.toString());
+			writer.println("Catch All Exception: " + e.toString() + "<br/>");
+			writer.println(org.apache.commons.lang.exception.ExceptionUtils.getStackTrace(e));
 		}
 
 	}
@@ -235,7 +236,8 @@ public class AmbariStoreServlet extends HttpServlet {
 			writer.println("NullPointerException caught.<br>");
 			writer.println(GenericException.prettyTrace(e));
 		} catch (Exception e) {
-			writer.println("Catch All Exception: " + e.getMessage());
+			writer.println("Catch All Exception: test == " + e.getMessage());
+			writer.println(org.apache.commons.lang.exception.ExceptionUtils.getStackTrace(e));
 		}
 	}
 

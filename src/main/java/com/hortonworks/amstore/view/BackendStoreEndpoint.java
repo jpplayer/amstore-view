@@ -136,9 +136,9 @@ public class BackendStoreEndpoint extends Endpoint {
 				StoreApplication app = new StoreApplicationFactory().
 						getStoreApplication(apps.getJSONObject(i));
 
-				if (app == null ) throw new RuntimeException("application null:" + apps.getJSONObject(i).toString());
-				if (app.app_id == null ) throw new RuntimeException("application id is null:" + apps.getJSONObject(i).toString());
-				storeApplications.put(app.app_id, app);
+				if (app == null ) {} // TODO: We need to add a "warning" line that lists the store but makes it unable to install --- throw new RuntimeException("application null:" + apps.getJSONObject(i).toString());
+				else if (app.app_id == null ) throw new RuntimeException("application id is null:" + apps.getJSONObject(i).toString());
+				else storeApplications.put(app.app_id, app);
 			}
 		} catch (IOException e) {
 			LOG.debug("IOException getting applications from store.");

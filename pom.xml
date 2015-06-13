@@ -20,7 +20,7 @@
 	<version>0.1.4</version>
 
 	<properties>
-		<ambari.version>1.7.0.0</ambari.version>
+		<ambari.version>2.0.0.0</ambari.version>
 		<ui.directory>${basedir}/src/main/resources/ui</ui.directory>
 	</properties>
 
