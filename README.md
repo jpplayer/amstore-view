@@ -33,7 +33,7 @@ curl http://amstore.cloudapp.net/amstore/install_store.sh | bash
    curl -O http://amstore.cloudapp.net/amstore/ambari-store-0.1.4.jar
    ambari-server restart
 ```
-Login to Ambari then instanciate the Ambari Store view.
+Login to Ambari then instanciate the Ambari Store view. The instance name must be "store".
 
 ## Screenshot
 
