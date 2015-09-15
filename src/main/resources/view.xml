@@ -16,7 +16,7 @@ limitations under the License. Kerberos, LDAP, Custom. Binary/Htt
 -->
 <view>
   <name>AMBARI-STORE</name>
-  <version>0.1.4</version>
+  <version>0.1.5</version>
   <view-class>com.hortonworks.amstore.view.StoreManager</view-class>
  
   <resource>
@@ -53,7 +53,7 @@ limitations under the License. Kerberos, LDAP, Custom. Binary/Htt
     <description>The password of an administrator for the local Ambari</description>
 	<default-value>admin</default-value>
 	<placeholder>admin</placeholder>
-	<masked>false</masked>
+	<masked>true</masked>
     <required>true</required>
   </parameter>
   
@@ -78,7 +78,7 @@ limitations under the License. Kerberos, LDAP, Custom. Binary/Htt
     <description>The password of an administrator</description>
 	<default-value></default-value>
 	<placeholder>admin</placeholder>
-	<masked>false</masked>
+	<masked>true</masked>
     <required>false</required>
   </parameter>
 

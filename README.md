@@ -30,7 +30,7 @@ curl http://amstore.cloudapp.net/amstore/install_store.sh | bash
    cd amstore-daemon && sh build.sh && sh install.sh
    /usr/local/bin/amstore-daemon.sh start
    cd /var/lib/ambari-server/resources/views
-   curl -O http://amstore.cloudapp.net/amstore/ambari-store-0.1.4.jar
+   curl -O http://amstore.cloudapp.net/amstore/ambari-store-0.1.5.jar
    ambari-server restart
 ```
 Login to Ambari then instanciate the Ambari Store view. The instance name must be "store".
@@ -80,7 +80,7 @@ Not all operations function well, in particular *updates* are not working.
  sh ./build.sh
 
 ######Requirements
-* JDK 1.6
+* JDK 1.7
 * Maven 3.0
 
 ######Maven modules

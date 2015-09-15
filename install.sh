@@ -8,14 +8,15 @@ CURL='curl'
 USERNAME="admin"
 PASSWORD="admin"
 agent="store-installer"
-VERSION="0.1.4"
+VERSION="0.1.5"
 USE_DEMO_SERVER=no
 
-read -d '' data << EOF
-[{ 
-"ViewInstanceInfo" : { "label" : "Ambari Store", "description" : "Ambari Application Store", 
-"properties" : {"amstore.ambari.cluster.url":"http://lake01.cloud.hortonworks.com:8080","amstore.ambari.cluster.password":"hortonworks","amstore.ambari.local.password":"admin","amstore.ambari.cluster.username":"remoteambari","amstore.ambari.local.username":"admin","amstore.ambari.local.url":"http://localhost:8080" } } }]
-EOF
+#read -d '' data << EOF
+#[{ 
+#"ViewInstanceInfo" : { "label" : "Ambari Store", "description" : "Ambari Application Store", 
+#"properties" : {"amstore.ambari.cluster.url":"http://lake01.cloud.hortonworks.com:8080","amstore.ambari.cluster.password":"hortonworks","amstore.ambari.local.password":"admin","amstore.ambari.cluster.username":"remoteambari","amstore.ambari.local.username":"admin","amstore.ambari.local.url":"http://localhost:8080" } } }]
+#EOF
+
 function create_instance2() {
 curl -u admin:admin -X POST -H "X-Requested-By: ambari" -d "${data}" http://localhost:8080/api/v1/views/AMBARI-STORE/versions/${VERSION}/instances/store     
 }
@@ -26,9 +27,8 @@ function usage() {
 
 echo '
 Usage: install.sh <options>
-    -u <username>   Specify username for Ambari. Defaults to admin.
-	-p <password>   Specify password for Ambari. Defaults to admin.
-Example: ./install.sh -u operator -p hadoop
+    -u <username>   Ambari administrator username. Defaults to "admin"
+    -p <password>   Ambari administrator password. Defaults to "admin".
 '
 }
 
@@ -46,10 +46,25 @@ CURL="$CURL -u $CREDENTIALS"
 
 function check_ambari(){
 	response=$( $CURL -i http://localhost:8080/api/v1/clusters 2>&1)
-	if [[ $response != *"HTTP/1.1 200 OK"* ]]
-	then
-		echo "Could not connect to Ambari. Ensure that the server is started. Specify non-default username and password if necessary."
+		
+	if [[ "$response" == *"HTTP/1.1 403 Bad credentials"* ]]; then
+		echo "ERROR: Invalid credentials."
 		usage
+		exit 1
+
+	elif [[ "$response" != *"HTTP/1.1 200 OK"* ]]
+	then
+		echo "ERROR: Failed connecting to Ambari. Ensure that the server is started. Error: $response"
+		usage
+		exit 1
+	fi
+}
+
+
+function check_administrator_access() {
+	isadmin=$( $CURL --silent http://localhost:8080/api/v1/users/${USERNAME} | python -c 'import sys,json; print json.load( sys.stdin )["Users"]["admin"]')
+	if [[ "$isadmin" != "True" ]]; then
+		echo "ERROR: User ${USERNAME} does not have administrator privileges."
 		exit 1
 	fi
 }
@@ -61,13 +76,9 @@ function get_cluster_name() {
        then
 		# Run curl without headers (no -i)
 		CLUSTER_NAME=$( $CURL --silent http://localhost:8080/api/v1/clusters | python -c 'import sys,json; print json.load( sys.stdin )["items"][0]["Clusters"]["cluster_name"]')
-	elif [[ $response == *"HTTP/1.1 403 Bad credentials"* ]]
-		then
-			echo "Invalid credentials. Please specify using the -u switch"
-			usage
-			exit 1
+		exit 1
 	else
-		echo "Error connecting to http://localhost:8080/api/v1/clusters $response"
+		echo "ERROR: Failed connecting to http://localhost:8080/api/v1/clusters. Error: $response"
 			exit 1
     fi
 }
@@ -151,6 +162,9 @@ echo "Ambari ready."
 
 # Check that we have a local Ambari
 check_ambari
+
+# Check the user is an administrator
+check_administrator_access
 
 # Get cluster name, serves as validation of settings also.
 #get_cluster_name

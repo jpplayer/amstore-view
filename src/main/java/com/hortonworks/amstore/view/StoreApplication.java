@@ -52,7 +52,6 @@ public abstract class StoreApplication implements
 	protected String app_id;
 	protected String category;
 
-	protected String label; // obsolete. label is viewName
 	protected String readiness;
 	protected String homepage;
 	protected String uri;
@@ -64,9 +63,6 @@ public abstract class StoreApplication implements
 
 	// Settings from view.xml
 	protected String type;
-
-	// TODO: move into StoreApplicationView
-	protected String viewName;
 
 	protected String version = "";
 	protected String instanceName;
@@ -85,9 +81,8 @@ public abstract class StoreApplication implements
 	protected StoreApplication() {
 	}
 
-	public StoreApplication(String viewName, String version,
+	public StoreApplication(String version,
 			String instanceName, String instanceDisplayName, String description) {
-		this.viewName = viewName;
 		this.version = version;
 		this.instanceName = instanceName;
 		this.instanceDisplayName = instanceDisplayName;
@@ -110,7 +105,6 @@ public abstract class StoreApplication implements
 		description = h._s(app, "description");
 		readiness = h._s(app, "readiness");
 		homepage = h._s(app, "homepage");
-		viewName = h._s(app, "view_name");
 		instanceName = h._s(app, "instance_name");
 		instanceDisplayName = h._s(app, "display_name");
 		package_uri = h._s(app, "package_uri");
@@ -137,9 +131,9 @@ public abstract class StoreApplication implements
 	/*
 	 * Abstract methods
 	 */
-	public abstract void deleteApplicationFiles();
+	public abstract void deleteApplicationFiles(AmbariEndpoint localAmbari) throws IOException;
 
-	public abstract String getPackageWorkdir();
+	public abstract String getPackageWorkdir(AmbariEndpoint localAmbari) throws IOException;
 
 	public abstract void doInstallStage1(AmbariEndpoint localAmbari)
 			throws IOException, StoreException;
@@ -166,10 +160,16 @@ public abstract class StoreApplication implements
 	public abstract void doUninstallStage1(AmbariEndpoint localAmbari)
 			throws IOException, StoreException;
 
+	public abstract void doDeinstantiateStage1(AmbariEndpoint localAmbari)
+			throws IOException, StoreException;
+
+	
 	/*
 	 * This method is used to quickly lookup an installed application (without
-	 * the version) views: view-$viewName-$instanceName services:
-	 * service-$serviceName assembly: assembly-$assemblyName
+	 * the version) 
+	 *   views: view-$viewName 
+	 *   services:service-$serviceName 
+	 *   assembly: assembly-$assemblyName
 	 */
 	public abstract String getCanonicalName();
 
@@ -181,7 +181,7 @@ public abstract class StoreApplication implements
 					.getResourceAsStream("store.properties");
 			try {
 				properties.load(stream);
-				mainStoreCanonicalName = "view-" + properties.getProperty("viewName") + "-" + properties.getProperty("instanceName");
+				mainStoreCanonicalName = "view-" + properties.getProperty("viewName"); // + "-" + properties.getProperty("instanceName");
 			} catch (IOException e) {
 				throw new RuntimeException(
 						"Error reading property file store.properties.");
@@ -260,12 +260,6 @@ public abstract class StoreApplication implements
 		}
 	}
 
-	public String getViewName() {
-		if (viewName == null)
-			throw new RuntimeException("Call to viewname returning null");
-		return viewName;
-	}
-
 	public String getVersion() {
 		return version;
 	}
@@ -276,10 +270,6 @@ public abstract class StoreApplication implements
 
 	public String getCategory() {
 		return category;
-	}
-
-	public String getLabel() {
-		return label;
 	}
 
 	public String getDescription() {
@@ -326,10 +316,11 @@ public abstract class StoreApplication implements
 		this.type = type;
 	}
 
-	public void deleteWorkDirectory() throws IOException {
-		String workDirectory = getPackageWorkdir();
+	public void deleteWorkDirectory(AmbariEndpoint localAmbari) throws IOException {
+		String workDirectory = getPackageWorkdir(localAmbari);
 		FileUtils.deleteDirectory(new File(workDirectory));
 	}
+	
 	public int compareVersions(String a, String b){
 		
 		String[] adots = a.split("\\.",2);

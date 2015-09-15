@@ -45,6 +45,8 @@ public class AmbariEndpoint extends Endpoint {
 			.getLogger(AmbariEndpoint.class);
 
 	protected String clusterName;
+	protected String clusterStackName;
+	protected String clusterStackVersion;
 	protected ViewContext viewContext;
 	protected ServicesConfiguration servicesConfiguration;
 
@@ -134,18 +136,55 @@ public class AmbariEndpoint extends Endpoint {
 		}
 	}
 
-	protected String netgetClusterName() throws IOException {
-		JSONObject clusterpage = AmbariStoreHelper.readJsonFromUrl(getUrl()
+	
+	/* Calling /api/v1/clusters/<clustername> is an expensive operation (pulls all desired states),
+	 * so we try to do it just once.
+	 * Caching enabled.
+	*/
+	private JSONObject clusterdetails = null;
+	// TODO	
+
+	/* Calling /api/v1/clusters just once and filling out clusterName and clusterStackVersion
+	 * 
+	 */
+	//TODO: replace all these global variables with a proper Cluster class.
+	protected void netgetClusterInfo() throws IOException {
+		JSONObject clusterdetails = AmbariStoreHelper.readJsonFromUrl(getUrl()
 				+ "/api/v1/clusters", username, password);
-		JSONArray clusters = clusterpage.getJSONArray("items");
+		JSONArray clusters = clusterdetails.getJSONArray("items");
 		if (clusters.length() == 0) {
-			clusterName = "";
+			this.clusterName = "";
+			this.clusterStackVersion = "";
 		} else {
 			JSONObject cluster = clusters.getJSONObject(0);
-			clusterName = cluster.getJSONObject("Clusters").getString(
+			this.clusterName = cluster.getJSONObject("Clusters").getString(
 					"cluster_name");
+			String[] clusterStackInfo = cluster.getJSONObject("Clusters").getString(
+					"version").split("-");
+			this.clusterStackName = clusterStackInfo[0];
+			this.clusterStackVersion = clusterStackInfo[1];
 		}
+	}
+	
+	//TODO: replace all these global variables with a proper Cluster class.
+	protected String netgetClusterName() throws IOException {
+		if( clusterName == null)
+			netgetClusterInfo();
 		return clusterName;
+	}
+
+	//TODO: replace all these global variables with a proper Cluster class.
+	protected String netgetClusterStackName() throws IOException {
+		if( clusterStackName == null)
+			netgetClusterInfo();
+		return clusterStackName;
+	}
+	
+	//TODO: replace all these global variables with a proper Cluster class.
+	protected String netgetClusterStackVersion() throws IOException {
+		if( clusterStackVersion == null)
+			netgetClusterInfo();
+		return clusterStackVersion;
 	}
 
 	public void createViewInstance(StoreApplicationView application)
@@ -271,6 +310,21 @@ public class AmbariEndpoint extends Endpoint {
 		curlDelete (url);
 	}
 
+	
+	public String getActiveStackName() throws IOException {
+		return netgetClusterStackName();
+	}
+	
+	public String getActiveStackVersion() throws IOException {
+		return netgetClusterStackVersion();
+	}
+
+
+	protected String getServicesFolder() throws IOException {
+		return "/var/lib/ambari-server/resources/stacks/"
+				+ getActiveStackName() + "/"
+				+ getActiveStackVersion() + "/services";
+	}
 
 	public void createService(StoreApplicationService applicationService) throws IOException {
 		throw new NotImplementedException("Not implemented: createService");
@@ -325,7 +379,7 @@ public class AmbariEndpoint extends Endpoint {
 	 */
 	public String restartAmbari() throws IOException {
 		String url = "http://localhost:5026/amstore/restart-ambari";
-		return AmbariStoreHelper.readStringFromUrl(url, null, null);
+		return curlGet(url);
 	}
 
 	// This function calls the Service for postInstallTasks

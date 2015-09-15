@@ -182,6 +182,12 @@ public class AmbariStoreHelper {
 
 		return proxy.request(ambari.getUrl() + url).setData(data).post().asJSON();
 	}
+	
+	public static String doGet(URLStreamProvider urlStreamProvider,
+			AmbariEndpoint ambari, String url)
+			throws IOException {
+		return readStringFromUrl( ambari.getUrl() + url, ambari.getUsername(), ambari.getPassword());
+	}
 
 	public static String doPost(URLStreamProvider urlStreamProvider,
 			AmbariEndpoint ambari, String url, String data)

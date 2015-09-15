@@ -38,7 +38,7 @@ public class StoreApplicationService extends StoreApplication {
 	private final static Logger LOG = LoggerFactory
 			.getLogger(StoreApplicationService.class);
 
-	String stackVersion = null;
+	//String stackVersion = null;
 	String serviceName = null;
 
 	String serviceFolderName = null;
@@ -56,7 +56,7 @@ public class StoreApplicationService extends StoreApplication {
 		AmbariStoreHelper h = new AmbariStoreHelper();
 		// Additional properties specific to SERVICE
 		// These are currently mandatory, throw exception if they are null.
-		stackVersion = h._s(app, "stack_version");
+//		stackVersion = h._s(app, "stack_version");
 		serviceName = h._s(app, "service_name");
 		serviceFolderName = h._s(app, "service_folder_name");
 	}
@@ -68,28 +68,12 @@ public class StoreApplicationService extends StoreApplication {
 	 * @see
 	 * com.hortonworks.amstore.view.StoreApplication#deleteApplicationFiles()
 	 */
-	public void deleteApplicationFiles() {
+	public void deleteApplicationFiles(AmbariEndpoint clusterAmbari) {
 		try {
-			deleteWorkDirectory();
+			deleteWorkDirectory(clusterAmbari);
 		} catch (IOException e) {
 			LOG.warn("StoreApplication.deleteApplicationFiles: Not all files removed successfully");
 		}
-	}
-
-	/*
-	 * (non-Javadoc)
-	 * 
-	 * @see com.hortonworks.amstore.view.StoreApplication#getPackageWorkdir()
-	 */
-	public String getPackageWorkdir() {
-		String workDirectory = getServicesFolder() + "/"
-				+ getServiceFolderName();
-		return workDirectory;
-	}
-
-	public String getServicesFolder() {
-		return "/var/lib/ambari-server/resources/stacks/HDP/"
-				+ getStackVersion() + "/services";
 	}
 
 	public String getPackageFilepath() {
@@ -101,10 +85,6 @@ public class StoreApplicationService extends StoreApplication {
 			return targetPath + "/" + filename;
 		} else
 			return null;
-	}
-
-	public String getStackVersion() {
-		return stackVersion;
 	}
 
 	public String getServiceFolderName() {
@@ -119,16 +99,16 @@ public class StoreApplicationService extends StoreApplication {
 		this.serviceName = serviceName;
 	}
 
-	public void downloadAndExtractPackage() throws IOException {
+	public void downloadAndExtractPackage(AmbariEndpoint clusterAmbari) throws IOException {
 		if (getPackage_uri() != null) {
 
 			// Check whether the file is already present (do not re-download)
 			// We pull the tarball into tmp
 			String filePath = getPackageFilepath();
 			File file = new File(filePath);
-			File dir = new File(getPackageWorkdir());
-			File svcs = new File(getServicesFolder());
-
+			File dir = new File(getPackageWorkdir(clusterAmbari));
+			File svcs = new File(clusterAmbari.getServicesFolder());
+			
 			if (!file.isFile()) {
 				// How can we do this in a thread and provide download
 				// update ? TODO
@@ -136,15 +116,28 @@ public class StoreApplicationService extends StoreApplication {
 			}
 			// Remove old folder and unpack into services folder
 			FileUtils.deleteDirectory(dir);
+			LOG.info("Extracting service package '" + filePath + "' to '" + clusterAmbari.getServicesFolder() + "'.");
 			Archiver archiver = ArchiverFactory.createArchiver("tar", "gz");
 			archiver.extract(file, svcs);
 		}
 	}
 
+	/*
+	 * (non-Javadoc)
+	 * 
+	 * @see com.hortonworks.amstore.view.StoreApplication#getPackageWorkdir()
+	 */
+	@Override
+	public String getPackageWorkdir(AmbariEndpoint localAmbari) throws IOException {
+		String workDirectory = localAmbari.getServicesFolder() + "/"
+				+ getServiceFolderName();
+		return workDirectory;
+	}
+	
 	@Override
 	public void doInstallStage1(AmbariEndpoint localAmbari) throws IOException,
 			StoreException {
-		downloadAndExtractPackage();
+		downloadAndExtractPackage(localAmbari);
 
 		// check that local ambari is managing a cluster
 		// If not, we cannot proceed to stage 2
@@ -192,8 +185,15 @@ public class StoreApplicationService extends StoreApplication {
 		localAmbari.deleteService(this);
 
 		// delete stack files
-		deleteApplicationFiles();
+		deleteApplicationFiles(localAmbari);
 	}
+	
+	@Override
+	public void doDeinstantiateStage1(AmbariEndpoint localAmbari)
+			throws IOException, StoreException{
+		throw new NotImplementedException("DeInstantiating a service not implemented");
+	}
+	
 
 	public String getCanonicalName() {
 		return "service-" + getServiceName();

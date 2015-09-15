@@ -166,7 +166,24 @@ public class MainStoreApplication extends StoreApplicationView {
 		initLocalEndpoint();
 		initClusterEndpoint();
 	}
+	
+	/*
+	 * Public method that should be called to reload the View configuration.
+	 */
+	public void reloadConfiguration() {
+		// Update Store configuration
+		initBackendStoreEndpoint();
+		
+		// Update Ambari endpoints
+		initAmbariEndpoints();
+	}
 
+	protected void initBackendStoreEndpoint(){
+		// TODO: implement backend store credentials instead of anonymous binding
+		storeEndpoint = new BackendStoreEndpoint(getBackendStoreUrl(),
+				null, null);
+	}
+	
 	protected void initLocalEndpoint() {
 		ambariViews = AmbariEndpoint.getAmbariLocalEndpoint(viewContext);
 	}
@@ -183,6 +200,10 @@ public class MainStoreApplication extends StoreApplicationView {
 		return this.getIntanceProperties().get("amstore.url");
 	}
 
+	/*
+	 * Returns a cached backend store endpoint.
+	 * TODO: implement store credentials 
+	 */
 	public BackendStoreEndpoint getStoreEndpoint() {
 		if (storeEndpoint == null)
 			storeEndpoint = new BackendStoreEndpoint(getBackendStoreUrl(),
@@ -403,13 +424,14 @@ public class MainStoreApplication extends StoreApplicationView {
 		Map<String, StoreApplication> availableApplications = getStoreEndpoint()
 				.getAllApplicationsFromStore();
 		StoreApplication app = availableApplications.get(appId);
+		LOG.info("Starting download of application: " + app.getCanonicalName());
+		
 		try {
-			LOG.info("Starting download of application: " + app.getCanonicalName());
 			app.doInstallStage1(getAmbariLocal());
-		} catch (IOException e) {
-			LOG.warn("IOException downloading application:" + appId);
+			addPostInstallTask(app.uri);
+		} catch (IOException e){
+			throw new StoreException("Error installing " + app.getInstanceDisplayName(), StoreException.CODE.ERROR  );
 		}
-		addPostInstallTask(app.uri);
 	}
 
 	/*
@@ -472,7 +494,7 @@ public class MainStoreApplication extends StoreApplicationView {
 		addPostUpdateTask(newApplication.uri);
 	}
 
-	public void deleteApplication(String appId) throws IOException,
+	public void deinstantiateApplication(String appId) throws IOException,
 			StoreException {
 
 		// Get the installed version first
@@ -487,15 +509,8 @@ public class MainStoreApplication extends StoreApplicationView {
 			return;
 		}
 
-		// Note: we must get the information about this exact version, not any
-		// new version that might show up on the app store.
-		url = "/api/v1/views/" + installedApplication.getViewName()
-				+ "/versions/" + installedApplication.getVersion()
-				+ "/instances/" + installedApplication.getInstanceName();
-
-		LOG.debug("Attempting to delete: '" + url);
-		AmbariStoreHelper.doDelete(this.viewContext.getURLStreamProvider(),
-				this.ambariViews, url);
+		LOG.debug("Attempting to delete: '" + installedApplication.getCanonicalName());
+		installedApplication.doDeinstantiateStage1(getAmbariLocal());
 	}
 
 	/*
@@ -618,11 +633,21 @@ public class MainStoreApplication extends StoreApplicationView {
 	 * SerializationUtils.serialize(yourObject); deserialize: YourObject
 	 * yourObject = (YourObject) SerializationUtils.deserialize(byte[] data)
 	 */
-	public List<String> getPostInstallTasks() {
-		String tasks = viewContext.getInstanceData("post-install-tasks");
+	public List<String> getPostInstallTasks() throws IOException {
+		
+		
+		String url = "/api/v1/views/" + this.getViewName() + "/versions/"
+				+ this.version + "/instances/" + this.instanceName
+				+ "/resources/taskmanager/postinstalltasks";
+	
+		String tasks = AmbariStoreHelper.doGet(viewContext.getURLStreamProvider(),
+				ambariViews, url);
+		
+		// TODO: DELETE this. Fix for multiple admins above.
+		String oldtasks = viewContext.getInstanceData("post-install-tasks");
 
 		List<String> tasklist = new ArrayList<String>();
-		if (tasks == null) {
+		if (tasks == null || tasks.equals("")) {
 			return tasklist;
 		}
 
@@ -645,7 +670,16 @@ public class MainStoreApplication extends StoreApplicationView {
 		LOG.debug("Starting postInstallTasks");
 		List<StoreException> exceptions = new LinkedList<StoreException>();
 
-		List<String> tasks = getPostInstallTasks();
+		List<String> tasks = null;
+		
+		try {
+			tasks = getPostInstallTasks();
+		} catch (IOException e) {
+			exceptions.add(new StoreException("Error: IOException getting Post-install tasks. "
+					+ e.toString(), CODE.ERROR));
+			return exceptions;
+		}
+		
 		for (String uri : tasks) {
 			LOG.debug("Processing uri: " + uri);
 
@@ -731,8 +765,11 @@ public class MainStoreApplication extends StoreApplicationView {
 	/*
 	 * $CURL -H "X-Requested-By: $agent" -X POST
 	 * 'http://localhost:8080/api/v1/views/AMBARI-STORE/versions/0.1.0/instances/store/resources/taskmanager/reconfigure'
+
+	 * NOTE: We cannot use the current logged in admin for this. Instead, we need to store
+	 * the instance data as the admin user defined in the Store properties (amstore.local.username)
 	 */
-	public void addPostInstallTask(String task) {
+	public void addPostInstallTask(String task)  throws IOException {
 
 		/*
 		 * TODO: ERROR 500. This completely breaks Ambari.
@@ -755,7 +792,7 @@ public class MainStoreApplication extends StoreApplicationView {
 	}
 
 	// For debugging
-	public void cleartasks() {
+	public void cleartasks()  throws IOException {
 		List<String> updates = getPostUpdateTasks();
 		for (String task : updates) {
 			removePostUpdateTask(task);

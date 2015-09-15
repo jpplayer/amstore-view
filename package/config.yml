@@ -1,6 +1,6 @@
 app_id: ambari-store
 view_name: AMBARI-STORE
-version: '0.1.4'
+version: '0.1.5'
 
 type: VIEW
 category: administration
@@ -10,7 +10,7 @@ logo: hortonworks.jpg
 contributor: Jean-Philippe Player <jp@hortonworks.com>
 packager: Jean-Philippe Player <jp@hortonworks.com>
 homepage: https://github.com/jpplayer/amstore-view
-package: http://amstore.cloudapp.net/amstore/ambari-store-0.1.4.jar
+package: http://amstore.cloudapp.net/amstore/ambari-store-0.1.5.jar
 readiness: experimental
 tags: 
  - ambari

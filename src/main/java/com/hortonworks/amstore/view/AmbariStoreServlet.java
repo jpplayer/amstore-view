@@ -89,7 +89,12 @@ public class AmbariStoreServlet extends HttpServlet {
 		// very important, used throughout
 		writer = response.getWriter();
 
+		// Reload all settings in case they changed
+		mainStoreApplication.reloadConfiguration();
+		
 		bootstrapjs(response);
+
+		
 		writer.println("<h2>Ambari Store</h2>");
 		displayExceptions(latestExceptions);
 		latestExceptions = new LinkedList<StoreException>();
@@ -498,13 +503,23 @@ public class AmbariStoreServlet extends HttpServlet {
 		}
 	}
 
+	//TODO: hopefully we can remove this soon
+	//WARNING: hardcoded url
 	protected void restartAmbari(HttpServletResponse response)
 			throws IOException {
 		PrintWriter writer = response.getWriter();
 
-		String output = mainStoreApplication.getAmbariViews().restartAmbari();
-		writer.println(output);
-		writer.println(waitForAmbariHtml());
+		try {
+			String output = mainStoreApplication.getAmbariViews().restartAmbari();
+			writer.println(output);
+			writer.println(waitForAmbariHtml());
+		} catch (IOException e){
+			writer.println(
+					"Error: Ambari restart daemon unreachable. Please restart Ambari manually. <br>"
+				  + "http://localhost:5026/amstore/restart-ambari: "
+				  +	e.getMessage() 
+					);
+		}
 	}
 
 	// We get called if endpointChecks == false
@@ -552,14 +567,10 @@ public class AmbariStoreServlet extends HttpServlet {
 			HttpServletResponse response) throws IOException {
 
 		PrintWriter writer = response.getWriter();
-		writer.println("<h1>Backend Store is not available</h1>");
-		writer.println("Issue connecting to backend store. Please verify connectivity to "
-				+ mainStoreApplication.getStoreEndpoint().getUrl() + "<br>");
-		writer.println("Hints:<br><ul>");
-		writer.println("<li>You must be on VPN to access the Store.</li>");
-		writer.println("<li>A sandbox VM running on a laptop will need a \"Host-Only adapter\" in addition to the NAT network, .</li>");
-		writer.println("</ul><br>");
-		writer.println("For more information see <a href='http://wiki.hortonworks.com'>http://wiki.hortonworks.com</a>");
+		writer.println("<h1>Unable to access Ambari Store</h1>");
+		writer.println("Please verify connectivity to "
+				+ mainStoreApplication.getStoreEndpoint().getUrl() + ".<br>");
+		writer.println("The store URL can be changed in the view configuration.<br>");
 	}
 
 	// For debug
@@ -574,7 +585,7 @@ public class AmbariStoreServlet extends HttpServlet {
 			writer.println("<tr>");
 			writer.println("<td>" + app.getKey() + "</td>");
 			if (app.getValue().isView())
-				writer.println("<td>" + app.getValue().getViewName() + "</td>");
+				writer.println("<td>" + ((StoreApplicationView)app).getViewName() + "</td>");
 			else
 				writer.println("<td>"
 						+ ((StoreApplicationService) app.getValue())
@@ -670,7 +681,7 @@ public class AmbariStoreServlet extends HttpServlet {
 		LOG.debug("Starting deletions.\n");
 		for (String app_id : app_ids) {
 			try {
-				mainStoreApplication.deleteApplication(app_id);
+				mainStoreApplication.deinstantiateApplication(app_id);
 			} catch (StoreException e) {
 				exceptions.add(e);
 			}

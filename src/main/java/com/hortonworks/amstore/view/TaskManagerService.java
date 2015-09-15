@@ -89,6 +89,17 @@ public class TaskManagerService {
 		return Response.ok(entity).type("text/json").build();
 	}
 
+	
+	@GET
+	@Path("/postinstalltasks")
+	@Produces({ "text/plain" })
+	public Response getInstallTasks(String body, @Context HttpHeaders headers,
+			@Context UriInfo ui) throws IOException {
+		
+		String tasks = viewContext.getInstanceData("post-install-tasks");
+		return Response.ok(tasks).type("text/plain").build();
+	}
+	
 	/**
 	 * Handles: POST /taskmanager/postinstalltasks Add a task to the list of
 	 * tasks This is done because of BUG: a call to viewContext.putInstanceData
@@ -229,6 +240,7 @@ public class TaskManagerService {
 		String output = "Added task:" + body;
 		return Response.ok(output).type("text/html").build();
 	}
+
 
 	/**
 	 * Handles: DELETE /taskmanager/postupdatetasks Removes a task from the

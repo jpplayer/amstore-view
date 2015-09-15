@@ -41,8 +41,8 @@ public class StoreApplicationView extends StoreApplication {
 	private final static Logger LOG = LoggerFactory
 			.getLogger(StoreApplicationView.class);
 
-	//protected String viewName;
-
+	protected String viewName;
+	
 	protected StoreApplicationView() {
 		super();
 		setType("VIEW");
@@ -52,13 +52,17 @@ public class StoreApplicationView extends StoreApplication {
 	public StoreApplicationView(ViewContext viewContext, String viewName,
 			String version, String instanceName, String instanceDisplayName,
 			String description){
-		super( viewName,
+		super(
 			 version,  instanceName,  instanceDisplayName,
 			 description);
+		this.viewName = viewName;
 	}
 	
+	@SuppressWarnings("static-access")
 	public StoreApplicationView(JSONObject app) {
 		super(app);
+		AmbariStoreHelper h = new AmbariStoreHelper();
+		viewName = h._s(app, "view_name");
 	}
 	
 	public StoreApplicationView(ViewInstanceDefinition viewInstanceDefinition) {
@@ -71,10 +75,10 @@ public class StoreApplicationView extends StoreApplication {
 	}
 
 	@Override	
-	public void deleteApplicationFiles() {
+	public void deleteApplicationFiles(AmbariEndpoint localAmbari) {
 		try {
 			deletePackageFile();
-			deleteWorkDirectory();
+			deleteWorkDirectory(localAmbari);
 		} catch (IOException e) {
 			LOG.warn("StoreApplication.deleteApplicationFiles: Not all files removed successfully");
 		}
@@ -91,8 +95,9 @@ public class StoreApplicationView extends StoreApplication {
 			return null;
 	}
 
+	// TODO: This should be calling the ambari endpoint
 	@Override
-	public String getPackageWorkdir() {
+	public String getPackageWorkdir(AmbariEndpoint localAmbari) throws IOException {
 		String workDirectory = "/var/lib/ambari-server/resources/views/work/"
 				+ getViewName() + "{" + getVersion() + "}";
 		return workDirectory;
@@ -130,7 +135,7 @@ public class StoreApplicationView extends StoreApplication {
 		 * Check whether we can install. If the package has not yet been
 		 * expanded we must wait for Ambari restart.
 		 */
-		File workdir = new File(getPackageWorkdir());
+		File workdir = new File(getPackageWorkdir(localAmbari));
 		if (!workdir.isDirectory()) {
 			LOG.debug("The application " + instanceDisplayName
 					+ " has not yet been unpacked. Requires restart.");
@@ -169,7 +174,7 @@ public class StoreApplicationView extends StoreApplication {
 		 * Check whether we can install. If the package has not yet been
 		 * expanded we must wait for Ambari restart.
 		 */
-		File workdir = new File(newApplication.getPackageWorkdir());
+		File workdir = new File(newApplication.getPackageWorkdir(localAmbari));
 		if (!workdir.isDirectory()) {
 			LOG.debug("The application has not yet been unpacked. Requires restart.");
 			return;
@@ -177,14 +182,14 @@ public class StoreApplicationView extends StoreApplication {
 		else {
 			// instantiate the new view
 			LOG.debug("Starting post update task for : "
-					+ newApplication.getPackageWorkdir() + "\n");
+					+ newApplication.getPackageWorkdir(localAmbari) + "\n");
 
 
 			LOG.debug("creating view: " + newApplication.instanceName);
 			localAmbari.createViewInstance( (StoreApplicationView)newApplication);
 
 			// delete any remaining files
-			this.deleteApplicationFiles();
+			this.deleteApplicationFiles(localAmbari);
 			
 			// delete any old instance
 			// Exception: if we are updating the main store, could lead
@@ -193,6 +198,11 @@ public class StoreApplicationView extends StoreApplication {
 		}
 	}
 
+	public String getViewName() {
+		if (viewName == null)
+			throw new RuntimeException("Call to viewname returning null");
+		return viewName;
+	}
 
 	@Override
 	public void doUninstallStage1(AmbariEndpoint localAmbari )
@@ -200,12 +210,19 @@ public class StoreApplicationView extends StoreApplication {
 		// delete view instance
 		localAmbari.deleteViewInstance( this );
 		// delete view files
-		deleteApplicationFiles();
+		deleteApplicationFiles(localAmbari);
+	}
+	
+	@Override
+	public void doDeinstantiateStage1(AmbariEndpoint localAmbari)
+			throws IOException, StoreException{
+		// delete view instance
+		localAmbari.deleteViewInstance( this );
 	}
 	
 	@Override
 	public String getCanonicalName(){
-		return "view-" + getViewName() + "-" + getInstanceName();
+		return "view-" + getViewName(); // + "-" + getInstanceName();
 	}
 	
 } // End class
