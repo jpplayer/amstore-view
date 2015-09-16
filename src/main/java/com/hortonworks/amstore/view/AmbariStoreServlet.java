@@ -51,8 +51,7 @@ import static org.apache.commons.lang.StringEscapeUtils.escapeHtml;
 public class AmbariStoreServlet extends HttpServlet {
 
 	private static final long serialVersionUID = 1L;
-	private final static Logger LOG = LoggerFactory
-			.getLogger(AmbariStoreServlet.class);
+	private final static Logger LOG = LoggerFactory.getLogger(AmbariStoreServlet.class);
 
 	private ViewContext viewContext;
 	private boolean endpointIssues = true; // we assume the worst
@@ -73,17 +72,26 @@ public class AmbariStoreServlet extends HttpServlet {
 		super.init(config);
 
 		ServletContext context = config.getServletContext();
-		viewContext = (ViewContext) context
-				.getAttribute(ViewContext.CONTEXT_ATTRIBUTE);
+		viewContext = (ViewContext) context.getAttribute(ViewContext.CONTEXT_ATTRIBUTE);
 
 		// main Store Instance (this)
 		mainStoreApplication = new MainStoreApplication(viewContext);
 	}
 
+	// Security
+	protected boolean isAdmin() {
+		try {
+			return mainStoreApplication.getAmbariLocal().isAdmin(viewContext.getUsername());
+		} catch (IOException e) {
+			// when in doubt return false
+			LOG.warn("IOException getting admin status for user " + viewContext.getUsername());
+			return false;
+		}
+	}
+
 	// GET
 	@Override
-	protected void doGet(HttpServletRequest request,
-			HttpServletResponse response) throws IOException {
+	protected void doGet(HttpServletRequest request, HttpServletResponse response) throws IOException {
 		response.setContentType("text/html");
 		response.setStatus(HttpServletResponse.SC_OK);
 		// very important, used throughout
@@ -91,10 +99,9 @@ public class AmbariStoreServlet extends HttpServlet {
 
 		// Reload all settings in case they changed
 		mainStoreApplication.reloadConfiguration();
-		
+
 		bootstrapjs(response);
 
-		
 		writer.println("<h2>Ambari Store</h2>");
 		displayExceptions(latestExceptions);
 		latestExceptions = new LinkedList<StoreException>();
@@ -109,8 +116,7 @@ public class AmbariStoreServlet extends HttpServlet {
 			}
 
 			if (request.getParameter("app_id") != null) {
-				displayApplicationDetails(request.getParameter("app_id"),
-						response);
+				displayApplicationDetails(request.getParameter("app_id"), response);
 				return;
 			}
 
@@ -130,8 +136,8 @@ public class AmbariStoreServlet extends HttpServlet {
 
 	// POST - ROUTING
 	@Override
-	protected void doPost(HttpServletRequest request,
-			HttpServletResponse response) throws ServletException, IOException {
+	protected void doPost(HttpServletRequest request, HttpServletResponse response)
+			throws ServletException, IOException {
 		response.setContentType("text/html");
 		response.setStatus(HttpServletResponse.SC_OK);
 		// very important, used throughout
@@ -139,11 +145,15 @@ public class AmbariStoreServlet extends HttpServlet {
 
 		// Duplicates Get()
 		bootstrapjs(response);
+
 		writer.println("<h2>Ambari Store</h2>");
+		
 		displayExceptions(latestExceptions);
 		latestExceptions = new LinkedList<StoreException>();
 		try {
-
+			if( ! isAdmin() )
+				throw new org.apache.ambari.view.SecurityException("User is not an administrator. Cannot post.");
+			
 			if (endpointIssues) {
 				displayChecks(request, response);
 				// If we still have issues after the checks
@@ -200,15 +210,15 @@ public class AmbariStoreServlet extends HttpServlet {
 				;
 				try {
 					updateExceptions = mainStoreApplication.doPostUpdateTasks();
-					installExceptions = mainStoreApplication
-							.doPostInstallTasks();
+					installExceptions = mainStoreApplication.doPostInstallTasks();
 					writer.println("Please refresh your browser.");
 				} catch (GenericException e) {
 					writer.println("Could not proceed. Make sure you have restarted Ambari");
 				}
 				if (mainStoreApplication.getPostUpdateTasks().size()
 						+ mainStoreApplication.getPostInstallTasks().size() != 0)
-					writer.println("Not all tasks completed. Make sure you have restarted Ambari. Services must be installed manually.");
+					writer.println(
+							"Not all tasks completed. Make sure you have restarted Ambari. Services must be installed manually.");
 				displayExceptions(updateExceptions);
 				displayExceptions(installExceptions);
 			} else { // Process checked apps
@@ -234,6 +244,8 @@ public class AmbariStoreServlet extends HttpServlet {
 				redirectHome(response);
 			}
 
+		} catch (org.apache.ambari.view.SecurityException e) {
+			writer.println("Error: " + e.getMessage() + "<br>");			
 		} catch (GenericException e) {
 			writer.println("Warning: " + e.getMessage() + "<br>");
 			displayAllApplications(request, response);
@@ -244,53 +256,41 @@ public class AmbariStoreServlet extends HttpServlet {
 			writer.println("Catch All Exception: test == " + e.getMessage());
 			writer.println(org.apache.commons.lang.exception.ExceptionUtils.getStackTrace(e));
 		}
+
 	}
 
-	protected void displayApplicationDetails(String app_id,
-			HttpServletResponse response) throws IOException {
+	protected void displayApplicationDetails(String app_id, HttpServletResponse response) throws IOException {
 
 		PrintWriter writer = response.getWriter();
 
 		// TODO: simplify the next 2 statements
-		Map<String, StoreApplication> availableApplications = mainStoreApplication
-				.getStoreEndpoint().getAllApplicationsFromStore();
+		Map<String, StoreApplication> availableApplications = mainStoreApplication.getStoreEndpoint()
+				.getAllApplicationsFromStore();
 		StoreApplication app = BackendStoreEndpoint
-				.netgetApplicationFromStoreByUri(availableApplications
-						.get(app_id).uri);
+				.netgetApplicationFromStoreByUri(availableApplications.get(app_id).uri);
 
 		writer.println("<table class=table>");
-		writer.println("<tr><td>Display Name</td><td><b>"
-				+ app.instanceDisplayName + "</b></td></tr>");
+		writer.println("<tr><td>Display Name</td><td><b>" + app.instanceDisplayName + "</b></td></tr>");
 		writer.println("<tr></tr>");
 		writer.println("<tr><td>app_id</td><td>" + app.app_id + "</td></tr>");
-		writer.println("<tr><td>Name</td><td>" + app.getCanonicalName()
-				+ "</td></tr>");
+		writer.println("<tr><td>Name</td><td>" + app.getName() + "</td></tr>");
 		writer.println("<tr><td>Version</td><td>" + app.version + "</td></tr>");
-		writer.println("<tr><td>Instance Name</td><td>" + app.instanceName
-				+ "</td></tr>");
-		writer.println("<tr><td>Download link</td><td>" + app.getPackage_uri()
-				+ "</td></tr>");
-		writer.println("<tr><td>Readiness</td><td>" + app.readiness
-				+ "</td></tr>");
-		writer.println("<tr><td>Contributed by</td><td>"
-				+ escapeHtml(app.getContributor()) + "</td></tr>");
-		writer.println("<tr><td>Packaged by</td><td>"
-				+ escapeHtml(app.getPackager()) + "</td></tr>");
-		writer.println("<tr><td>Description</td><td>" + app.description
-				+ "</td></tr>");
-		writer.println("<tr><td>Homepage</td><td><a target='_blank' href='"
-				+ app.homepage + "'>" + app.homepage + "</a></td></tr>");
+		writer.println("<tr><td>Instance Name</td><td>" + app.instanceName + "</td></tr>");
+		writer.println("<tr><td>Download link</td><td>" + app.getPackage_uri() + "</td></tr>");
+		writer.println("<tr><td>Readiness</td><td>" + app.readiness + "</td></tr>");
+		writer.println("<tr><td>Contributed by</td><td>" + escapeHtml(app.getContributor()) + "</td></tr>");
+		writer.println("<tr><td>Packaged by</td><td>" + escapeHtml(app.getPackager()) + "</td></tr>");
+		writer.println("<tr><td>Description</td><td>" + app.description + "</td></tr>");
+		writer.println("<tr><td>Homepage</td><td><a target='_blank' href='" + app.homepage + "'>" + app.homepage
+				+ "</a></td></tr>");
 		writer.println("<tr><td>Properties</td></tr>");
 		writer.println("<tr></tr>");
 
 		try {
-			Map<String, String> mapped = mainStoreApplication
-					.getMappedProperties(app);
-			for (Entry<String, String> e : app.getBackendProperties()
-					.entrySet()) {
-				writer.println("<tr><td>" + e.getKey() + "</td><td>"
-						+ e.getValue() + "</td><td>" + mapped.get(e.getKey())
-						+ "</td></tr>");
+			Map<String, String> mapped = mainStoreApplication.getMappedProperties(app);
+			for (Entry<String, String> e : app.getBackendProperties().entrySet()) {
+				writer.println("<tr><td>" + e.getKey() + "</td><td>" + e.getValue() + "</td><td>"
+						+ mapped.get(e.getKey()) + "</td></tr>");
 			}
 		} catch (StoreException e) {
 			writer.println("<tr><td>Exception:" + e.getMessage() + "</td></tr>");
@@ -300,8 +300,7 @@ public class AmbariStoreServlet extends HttpServlet {
 	}
 
 	// list all amstore applications
-	private void displayAllApplications(HttpServletRequest request,
-			HttpServletResponse response) throws IOException {
+	private void displayAllApplications(HttpServletRequest request, HttpServletResponse response) throws IOException {
 
 		PrintWriter writer = response.getWriter();
 		// Post Install Tasks
@@ -311,35 +310,36 @@ public class AmbariStoreServlet extends HttpServlet {
 		Set<String> allTasks = new HashSet<String>(updateTasks);
 		allTasks.addAll(installTasks);
 
+		String disabledhtml = "";
+		if (!isAdmin()) {
+			writer.println("Welcome " + viewContext.getUsername() + ". You are in read-only mode.");
+			disabledhtml = "disabled";
+		}
+
 		if (allTasks.size() != 0) {
-			writer.println("<h3>Update steps remaining.</h3> After restarting Ambari, click \"Finish Installations\" to complete the installation. The following applications need a restart or finalize:");
+			writer.println(
+					"<h3>Update steps remaining.</h3> After restarting Ambari, click \"Finish Installations\" to complete the installation. The following applications need a restart or finalize:");
 			writer.println("<br><table class=table><tr>");
 			for (String uri : allTasks) {
-				StoreApplication application = BackendStoreEndpoint
-						.netgetApplicationFromStoreByUri(uri);
-				writer.println("<td>" + application.instanceDisplayName
-						+ "</td>");
+				StoreApplication application = BackendStoreEndpoint.netgetApplicationFromStoreByUri(uri);
+				writer.println("<td>" + application.instanceDisplayName + "</td>");
 			}
 			writer.println("</tr></table>");
 		}
 
 		// TODO: unsafe. Indexed by canonicalName
-		Map<String, StoreApplication> installedApplications = mainStoreApplication
-				.getInstalledApplications();
+		Map<String, StoreApplication> installedApplications = mainStoreApplication.getInstalledApplications();
 
 		writer.println("<form name=\"input\" method=\"POST\">");
 
-		writer.println("<input type=\"submit\" value=\"Check for updates\" name=\"check_updates\"/>");
-		writer.println("<input type=\"submit\" value=\"Restart Ambari\" name=\"restart_ambari\"/>");
-		writer.println("<input type=\"submit\" value=\"Finish installations\" name=\"post_install\"/>");
+		writer.println("<input type=\"submit\" value=\"Check for updates\" name=\"check_updates\" " + disabledhtml + "/>");
+		writer.println("<input type=\"submit\" value=\"Restart Ambari\" name=\"restart_ambari\" " + disabledhtml + "/>");
+		writer.println("<input type=\"submit\" value=\"Finish installations\" name=\"post_install\" " + disabledhtml + "/>");
 		writer.println("<p></p>");
 
-		writer.println("<div class=\"panel panel-success\">\n"
-				+ "  <!-- Default panel contents -->\n"
-				+ "  <div class=\"panel-heading\">All Applications</div>\n"
-				+ "  <div class=\"panel-body\">\n"
-				+ "    <p> Please select the applications you want to install. </p>\n"
-				+ "  </div>");
+		writer.println("<div class=\"panel panel-success\">\n" + "  <!-- Default panel contents -->\n"
+				+ "  <div class=\"panel-heading\">All Applications</div>\n" + "  <div class=\"panel-body\">\n"
+				+ "    <p> Please select the applications you want to install. </p>\n" + "  </div>");
 
 		writer.println("<table class=table>");
 		writer.println("<tr>");
@@ -354,17 +354,15 @@ public class AmbariStoreServlet extends HttpServlet {
 		writer.println("<th>Select</th>");
 		writer.println("</tr>");
 
-		Map<String, StoreApplication> availableApplications = mainStoreApplication
-				.getStoreEndpoint().getAllApplicationsFromStore();
+		Map<String, StoreApplication> availableApplications = mainStoreApplication.getStoreEndpoint()
+				.getAllApplicationsFromStore();
 
-		for (Map.Entry<String, StoreApplication> e : availableApplications
-				.entrySet()) {
+		for (Map.Entry<String, StoreApplication> e : availableApplications.entrySet()) {
 			StoreApplication app = e.getValue();
 			writer.println("<tr>");
 			writer.println("<td>" + app.category + "</td>");
 
-			writer.println("<td><a href='?app_id=" + app.app_id + "'>"
-					+ app.instanceDisplayName + "</a></td>");
+			writer.println("<td><a href='?app_id=" + app.app_id + "'>" + app.instanceDisplayName + "</a></td>");
 
 			writer.println("<td>");
 			writer.println(app.version);
@@ -377,28 +375,23 @@ public class AmbariStoreServlet extends HttpServlet {
 
 			writer.println("<td>");
 			if (installedApplications.containsKey(app.getCanonicalName())) {
-				writer.println(installedApplications
-						.get(app.getCanonicalName()).getVersion());
+				writer.println(installedApplications.get(app.getCanonicalName()).getVersion());
 			}
 			writer.println("</td>");
 
 			writer.println("<td>");
 			try {
-			if (installedApplications.containsKey(app.getCanonicalName())
-					&& installedApplications
-						.get(app.getCanonicalName())
-						.compareTo(app)
-						 < 0 ) {
-				writer.println("update");
-			}
+				if (installedApplications.containsKey(app.getCanonicalName())
+						&& installedApplications.get(app.getCanonicalName()).compareTo(app) < 0) {
+					writer.println("update");
+				}
 			} catch (Exception ex) {
 				// Update not implemented
 			}
 			writer.println("</td>");
 
 			writer.println("<td align='center'>");
-			writer.println("<input type='checkbox' name='checked' value='"
-					+ app.app_id + "'>");
+			if (isAdmin()) writer.println("<input type='checkbox' name='checked' value='" + app.app_id + "'>");
 			writer.println("</td>");
 			writer.println("</tr>");
 		}
@@ -406,22 +399,20 @@ public class AmbariStoreServlet extends HttpServlet {
 		writer.println("</table>");
 		writer.println("</div>");
 		writer.println("<br/>");
-		writer.println("<input type=\"submit\" value=\"Install Selected\" name=\"install\"/>");
+		writer.println("<input " + disabledhtml + " type=\"submit\" value=\"Install Selected\" name=\"install\"/>");
 		writer.println("<input disabled type=\"submit\" value=\"Update Selected (not implemented)\" name=\"update\"/>");
-		writer.println("<input type=\"submit\" value=\"Delete Selected\" name=\"delete\"/>");
-		writer.println("<input type=\"submit\" value=\"Uninstall Selected\" name=\"uninstall\"/>");
-		writer.println("<input type=\"submit\" value=\"Reconfigure Store\" name=\"reconfigurepage\">");
+		writer.println("<input " + disabledhtml + " type=\"submit\" value=\"Delete Selected\" name=\"delete\"/>");
+		writer.println("<input " + disabledhtml + " type=\"submit\" value=\"Uninstall Selected\" name=\"uninstall\"/>");
+		writer.println("<input " + disabledhtml + " type=\"submit\" value=\"Reconfigure Store\" name=\"reconfigurepage\">");
 		writer.println("</form>");
 
 		// writer.println("<br>");
 		// displayInstalledApplicationInformation(response);
 	}
 
-	private void displayPreferences(HttpServletRequest request,
-			HttpServletResponse response) throws IOException {
+	private void displayPreferences(HttpServletRequest request, HttpServletResponse response) throws IOException {
 
-		Map<String, String> data = new TreeMap<String, String>(
-				viewContext.getProperties());
+		Map<String, String> data = new TreeMap<String, String>(viewContext.getProperties());
 
 		PrintWriter writer = response.getWriter();
 
@@ -470,7 +461,8 @@ public class AmbariStoreServlet extends HttpServlet {
 		writer.println("</td></tr>");
 
 		writer.println("<tr><td colspan=2 align=center>");
-		writer.println("<input disabled type=\"submit\" value=\"Apply to all Installed Applications (not implemented)\" name=\"reconfigureapps\">");
+		writer.println(
+				"<input disabled type=\"submit\" value=\"Apply to all Installed Applications (not implemented)\" name=\"reconfigureapps\">");
 		writer.println("</td></tr>");
 
 		writer.println("<tr><td colspan=2 align=center>");
@@ -490,8 +482,7 @@ public class AmbariStoreServlet extends HttpServlet {
 	 * Reconfigure the Ambari Store Properties, based on configured Ambari
 	 * Server Endpoints
 	 */
-	protected void reconfigure(HttpServletRequest request,
-			HttpServletResponse response) throws IOException {
+	protected void reconfigure(HttpServletRequest request, HttpServletResponse response) throws IOException {
 		PrintWriter writer = response.getWriter();
 
 		try {
@@ -503,28 +494,23 @@ public class AmbariStoreServlet extends HttpServlet {
 		}
 	}
 
-	//TODO: hopefully we can remove this soon
-	//WARNING: hardcoded url
-	protected void restartAmbari(HttpServletResponse response)
-			throws IOException {
+	// TODO: hopefully we can remove this soon
+	// WARNING: hardcoded url
+	protected void restartAmbari(HttpServletResponse response) throws IOException {
 		PrintWriter writer = response.getWriter();
 
 		try {
 			String output = mainStoreApplication.getAmbariViews().restartAmbari();
 			writer.println(output);
 			writer.println(waitForAmbariHtml());
-		} catch (IOException e){
-			writer.println(
-					"Error: Ambari restart daemon unreachable. Please restart Ambari manually. <br>"
-				  + "http://localhost:5026/amstore/restart-ambari: "
-				  +	e.getMessage() 
-					);
+		} catch (IOException e) {
+			writer.println("Error: Ambari restart daemon unreachable. Please restart Ambari manually. <br>"
+					+ "http://localhost:5026/amstore/restart-ambari: " + e.getMessage());
 		}
 	}
 
 	// We get called if endpointChecks == false
-	private void displayChecks(HttpServletRequest request,
-			HttpServletResponse response) throws IOException {
+	private void displayChecks(HttpServletRequest request, HttpServletResponse response) throws IOException {
 
 		PrintWriter writer = response.getWriter();
 		boolean issue = false;
@@ -541,8 +527,7 @@ public class AmbariStoreServlet extends HttpServlet {
 			issue = true;
 		}
 
-		if (mainStoreApplication.getAmbariRemote() != null
-				&& !mainStoreApplication.getAmbariRemote().isAvailable()) {
+		if (mainStoreApplication.getAmbariRemote() != null && !mainStoreApplication.getAmbariRemote().isAvailable()) {
 			writer.println("<h1>Error connecting to remote Ambari</h1>");
 			writer.println("Issue connecting to Ambari Remote Server. Please verify connectivity to "
 					+ mainStoreApplication.getAmbariRemote().getUrl() + "<br>");
@@ -552,9 +537,9 @@ public class AmbariStoreServlet extends HttpServlet {
 		if (mainStoreApplication.getAmbariCluster().isAvailable()
 				&& !mainStoreApplication.getAmbariCluster().isCluster()) {
 			writer.println("<h1>No Hadoop Cluster found.</h1>");
-			writer.println("You do not have any configured Ambari Cluster Servers. If your local Ambari is a Views only server, please specify an additional Ambari in the store configuration. <br>");
-			writer.println(mainStoreApplication.getAmbariCluster().getUrl()
-					+ " is not managing a cluster.");
+			writer.println(
+					"You do not have any configured Ambari Cluster Servers. If your local Ambari is a Views only server, please specify an additional Ambari in the store configuration. <br>");
+			writer.println(mainStoreApplication.getAmbariCluster().getUrl() + " is not managing a cluster.");
 			issue = true;
 		}
 
@@ -563,33 +548,26 @@ public class AmbariStoreServlet extends HttpServlet {
 	}
 
 	// What to do if endpoint not available.
-	private void displayStoreEndpointHelp(HttpServletRequest request,
-			HttpServletResponse response) throws IOException {
+	private void displayStoreEndpointHelp(HttpServletRequest request, HttpServletResponse response) throws IOException {
 
 		PrintWriter writer = response.getWriter();
 		writer.println("<h1>Unable to access Ambari Store</h1>");
-		writer.println("Please verify connectivity to "
-				+ mainStoreApplication.getStoreEndpoint().getUrl() + ".<br>");
+		writer.println("Please verify connectivity to " + mainStoreApplication.getStoreEndpoint().getUrl() + ".<br>");
 		writer.println("The store URL can be changed in the view configuration.<br>");
 	}
 
 	// For debug
-	private void displayInstalledApplicationInformation(
-			HttpServletResponse response) throws IOException {
+	private void displayInstalledApplicationInformation(HttpServletResponse response) throws IOException {
 		PrintWriter writer = response.getWriter();
-		Map<String, StoreApplication> installedApplications = mainStoreApplication
-				.getInstalledApplications();
+		Map<String, StoreApplication> installedApplications = mainStoreApplication.getInstalledApplications();
 		writer.println("<table>");
-		for (Entry<String, StoreApplication> app : installedApplications
-				.entrySet()) {
+		for (Entry<String, StoreApplication> app : installedApplications.entrySet()) {
 			writer.println("<tr>");
 			writer.println("<td>" + app.getKey() + "</td>");
 			if (app.getValue().isView())
-				writer.println("<td>" + ((StoreApplicationView)app).getViewName() + "</td>");
+				writer.println("<td>" + ((StoreApplicationView) app).getViewName() + "</td>");
 			else
-				writer.println("<td>"
-						+ ((StoreApplicationService) app.getValue())
-								.getServiceName() + "</td>");
+				writer.println("<td>" + ((StoreApplicationService) app.getValue()).getServiceName() + "</td>");
 
 			writer.println("<td>" + app.getValue().getInstanceName() + "</td>");
 			writer.println("</tr>");
@@ -599,12 +577,11 @@ public class AmbariStoreServlet extends HttpServlet {
 
 	// For debug
 	private void displayInstalledServicesInformation() throws IOException {
-		AmbariEndpoint.ServicesConfiguration servicesConfiguration = mainStoreApplication
-				.getAmbariCluster().getServicesConfiguration();
+		AmbariEndpoint.ServicesConfiguration servicesConfiguration = mainStoreApplication.getAmbariCluster()
+				.getServicesConfiguration();
 		writer.println("<table>");
 
-		for (Entry<String, AmbariEndpoint.ServiceConfiguration> s : servicesConfiguration
-				.getMap().entrySet()) {
+		for (Entry<String, AmbariEndpoint.ServiceConfiguration> s : servicesConfiguration.getMap().entrySet()) {
 			writer.println("<tr>");
 			writer.println("<td>" + s.getKey() + "</td>");
 			writer.println("<td>");
@@ -629,8 +606,7 @@ public class AmbariStoreServlet extends HttpServlet {
 		for (StoreException e : exceptions) {
 			// Only display errors or warnings
 			if (e.getCode() == CODE.ERROR || e.getCode() == CODE.WARNING) {
-				writer.println("<br><pre>" + "Exception:\n" + e.getMessage()
-						+ "</pre>");
+				writer.println("<br><pre>" + "Exception:\n" + e.getMessage() + "</pre>");
 			}
 		}
 	}
@@ -648,8 +624,7 @@ public class AmbariStoreServlet extends HttpServlet {
 				exceptions.add(e);
 			}
 		}
-		List<StoreException> postInstallExceptions = mainStoreApplication
-				.doPostInstallTasks();
+		List<StoreException> postInstallExceptions = mainStoreApplication.doPostInstallTasks();
 		exceptions.addAll(postInstallExceptions);
 		return exceptions;
 	}
@@ -708,8 +683,7 @@ public class AmbariStoreServlet extends HttpServlet {
 		return exceptions;
 	}
 
-	protected void redirectHome(HttpServletResponse response)
-			throws IOException {
+	protected void redirectHome(HttpServletResponse response) throws IOException {
 		response.sendRedirect("");
 	}
 
@@ -717,11 +691,9 @@ public class AmbariStoreServlet extends HttpServlet {
 		PrintWriter writer = response.getWriter();
 		writer.println("		<!-- Latest compiled and minified CSS -->\n"
 				+ "	<head>	<link rel=\"stylesheet\" href=\"https://maxcdn.bootstrapcdn.com/bootstrap/3.3.4/css/bootstrap.min.css\">\n"
-				+ "\n"
-				+ "		<!-- Optional theme -->\n"
+				+ "\n" + "		<!-- Optional theme -->\n"
 				+ "		<link rel=\"stylesheet\" href=\"https://maxcdn.bootstrapcdn.com/bootstrap/3.3.4/css/bootstrap-theme.min.css\">\n"
-				+ "\n"
-				+ "		<!-- Latest compiled and minified JavaScript -->\n"
+				+ "\n" + "		<!-- Latest compiled and minified JavaScript -->\n"
 				+ "		<script src=\"https://maxcdn.bootstrapcdn.com/bootstrap/3.3.4/js/bootstrap.min.js\"></script>\n"
 				+ "</head>");
 	}
@@ -732,22 +704,16 @@ public class AmbariStoreServlet extends HttpServlet {
 	 */
 	protected String waitForAmbariHtml() {
 		String html = "<div id='display'></div>"
-				+ "<script src=\"http://code.jquery.com/jquery-1.11.1.min.js\"></script>"
-				+ "<script>\n"
-				+ "    function doPoll(){\n"
-				+ "       $.ajax({\n"
-				+ "          url: '/api/v1/',\n"
-				+ "success: function(result){\n"
-				+ " $('#display').html('Ambari ready. Please refresh your browser');"
-				+ "         alert('Ambari is ready. Please refresh your browser')\n"
-				+ "          },     \n"
+				+ "<script src=\"http://code.jquery.com/jquery-1.11.1.min.js\"></script>" + "<script>\n"
+				+ "    function doPoll(){\n" + "       $.ajax({\n" + "          url: '/api/v1/',\n"
+				+ "success: function(result){\n" + " $('#display').html('Ambari ready. Please refresh your browser');"
+				+ "         alert('Ambari is ready. Please refresh your browser')\n" + "          },     \n"
 				+ "          error: function(result){\n"
 				+ "          if( result.status == 403 ) { $('#display').html('<font color=red>Ambari ready. Please refresh your browser</font>'); }    "
 				+ "              //alert('timeout/error');\n"
 				+ "          else {$('#display').html('Ambari is restarting. Please wait ...');"
-				+ "			  setTimeout(doPoll,1000);}\n" + "          }\n"
-				+ "       });\n" + "    }\n" + "   setTimeout(doPoll,5000);"
-				+ "</script>\n" + "";
+				+ "			  setTimeout(doPoll,1000);}\n" + "          }\n" + "       });\n" + "    }\n"
+				+ "   setTimeout(doPoll,5000);" + "</script>\n" + "";
 		return html;
 	}
 

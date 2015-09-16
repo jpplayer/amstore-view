@@ -225,4 +225,9 @@ public class StoreApplicationView extends StoreApplication {
 		return "view-" + getViewName(); // + "-" + getInstanceName();
 	}
 	
+	@Override
+	public String getName() {
+		return getViewName();
+	}
+	
 } // End class

@@ -168,11 +168,15 @@ public abstract class StoreApplication implements
 	 * This method is used to quickly lookup an installed application (without
 	 * the version) 
 	 *   views: view-$viewName 
-	 *   services:service-$serviceName 
+	 *   services: service-$serviceName 
 	 *   assembly: assembly-$assemblyName
 	 */
 	public abstract String getCanonicalName();
 
+	
+	public abstract String getName();
+
+	
 	// Only used for isStore()
 	private String getMainStoreCanonicalName() {
 		if (mainStoreCanonicalName == null) {

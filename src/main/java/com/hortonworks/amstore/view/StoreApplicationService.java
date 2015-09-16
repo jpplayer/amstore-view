@@ -43,10 +43,10 @@ public class StoreApplicationService extends StoreApplication {
 
 	String serviceFolderName = null;
 
-	// TODO: remove once we find a way to complete using at least version
-	public StoreApplicationService(String serviceName) {
+	public StoreApplicationService(String serviceName, String serviceVersion) {
 		super();
 		this.serviceName = serviceName;
+		this.version = serviceVersion;
 		setType("SERVICE");
 	}
 
@@ -153,10 +153,10 @@ public class StoreApplicationService extends StoreApplication {
 	public void doInstallStage2(AmbariEndpoint localAmbari, boolean reinstall)
 			throws IOException, StoreException {
 		// Check that the service is installed
-		if (!localAmbari.getListInstalledServiceNames().contains(
+		if (!localAmbari. getAvailableServices().keySet().contains(
 				getServiceName())) {
 			throw new StoreException(
-					"Info: Service not yet installed. Cannot proceed.",
+					"Info: Service not yet available. Cannot proceed.",
 					CODE.INFO);
 		}
 		// Kick off automated installation if requested.
@@ -182,7 +182,7 @@ public class StoreApplicationService extends StoreApplication {
 			throws IOException, StoreException {
 
 		// delete service with all components
-		localAmbari.deleteService(this);
+		localAmbari.deleteServiceInstance(this);
 
 		// delete stack files
 		deleteApplicationFiles(localAmbari);
@@ -194,9 +194,15 @@ public class StoreApplicationService extends StoreApplication {
 		throw new NotImplementedException("DeInstantiating a service not implemented");
 	}
 	
-
+	@Override
 	public String getCanonicalName() {
 		return "service-" + getServiceName();
 	}
 
+	@Override
+	public String getName() {
+		return getServiceName();
+	}
+
+	
 }

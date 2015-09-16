@@ -20,6 +20,7 @@ package com.hortonworks.amstore.view;
 
 import java.io.IOException;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedList;
@@ -41,8 +42,7 @@ import com.hortonworks.amstore.view.utils.ServiceFormattedException;
 
 public class AmbariEndpoint extends Endpoint {
 
-	private final static Logger LOG = LoggerFactory
-			.getLogger(AmbariEndpoint.class);
+	private final static Logger LOG = LoggerFactory.getLogger(AmbariEndpoint.class);
 
 	protected String clusterName;
 	protected String clusterStackName;
@@ -50,8 +50,7 @@ public class AmbariEndpoint extends Endpoint {
 	protected ViewContext viewContext;
 	protected ServicesConfiguration servicesConfiguration;
 
-	public AmbariEndpoint(ViewContext viewContext, String url, String username,
-			String password) {
+	public AmbariEndpoint(ViewContext viewContext, String url, String username, String password) {
 		super(url, username, password);
 		setUrl(url);
 		// Note: we do not initialize the clusterName yet.
@@ -68,309 +67,262 @@ public class AmbariEndpoint extends Endpoint {
 		}
 	}
 
-	public String getClusterApiEndpoint() {
+	// Reload all cached configuration
+	// TODO: this is incomplete
+	// Missing the list of all available configurations.
+	public void reloadClusterInfo() throws IOException {
+		netgetClusterInfo();
+		availableClusterServices = netgetAvailableServices();
+	}
+
+	public String getClusterApiEndpoint() throws IOException {
+		return getUrl() + "/api/v1/clusters/" + getClusterName();
+	}
+
+	public String getClusterStackApiEndpoint() {
 		try {
-			return getUrl() + "/api/v1/clusters/" + getClusterName();
+			return getUrl() + "/api/v1/stacks/" + getClusterStackName() + "/versions/" + getClusterStackVersion()
+					+ "/services";
 		} catch (IOException e) {
 			return null;
 		}
 	}
 
+	public String getClusterServicesApiEndpoint() {
+		try {
+			return getClusterApiEndpoint() + "/services";
+		} catch (IOException e) {
+			return null;
+		}
+	}
+
+	// TODO: replace all these global variables with a proper Cluster class.
 	public String getClusterName() throws IOException {
 		// Lazy init
 		if (clusterName == null) {
-			clusterName = netgetClusterName();
+			netgetClusterInfo();
 		}
 		return clusterName;
 	}
 
+	// TODO: replace all these global variables with a proper Cluster class.
+	public String getClusterStackName() throws IOException {
+		if (clusterStackName == null)
+			netgetClusterInfo();
+		return clusterStackName;
+	}
+
+	// TODO: replace all these global variables with a proper Cluster class.
+	public String getClusterStackVersion() throws IOException {
+		if (clusterStackVersion == null)
+			netgetClusterInfo();
+		return clusterStackVersion;
+	}
+
+	protected String getServicesFolder() throws IOException {
+		return "/var/lib/ambari-server/resources/stacks/" + getClusterStackName() + "/" + getClusterStackVersion()
+				+ "/services";
+	}
+
 	// This is only true because we ignore the clusterName
 	public boolean equals(AmbariEndpoint other) {
-		return this.getUrl().equals(other.getUrl())
-				&& this.username.equals(other.username)
+		return this.getUrl().equals(other.getUrl()) && this.username.equals(other.username)
 				&& this.password.equals(other.password);
 	}
 
-	public void reload() throws IOException {
-		clusterName = netgetClusterName();
-	}
-
 	public static AmbariEndpoint getAmbariLocalEndpoint(ViewContext viewContext) {
-		return new AmbariEndpoint(viewContext, viewContext.getProperties().get(
-				"amstore.ambari.local.url"), viewContext.getProperties().get(
-				"amstore.ambari.local.username"), viewContext.getProperties()
-				.get("amstore.ambari.local.password"));
+		return new AmbariEndpoint(viewContext, viewContext.getProperties().get("amstore.ambari.local.url"),
+				viewContext.getProperties().get("amstore.ambari.local.username"),
+				viewContext.getProperties().get("amstore.ambari.local.password"));
 	}
 
 	// Returns the endpoint if one is configured. Can be null.
 	public static AmbariEndpoint getAmbariRemoteEndpoint(ViewContext viewContext) {
-		String local = viewContext.getProperties().get(
-				"amstore.ambari.cluster.url");
+		String local = viewContext.getProperties().get("amstore.ambari.cluster.url");
 
 		if (local != null && !local.isEmpty()) {
-			return new AmbariEndpoint(viewContext, viewContext.getProperties()
-					.get("amstore.ambari.cluster.url"), viewContext
-					.getProperties().get("amstore.ambari.cluster.username"),
-					viewContext.getProperties().get(
-							"amstore.ambari.cluster.password"));
+			return new AmbariEndpoint(viewContext, viewContext.getProperties().get("amstore.ambari.cluster.url"),
+					viewContext.getProperties().get("amstore.ambari.cluster.username"),
+					viewContext.getProperties().get("amstore.ambari.cluster.password"));
 		} else {
 			return null;
 		}
 	}
 
 	// Select appropriate Ambari server (local or remote if Views Server)
-	public static AmbariEndpoint getAmbariClusterEndpoint(
-			ViewContext viewContext) {
-		String local = viewContext.getProperties().get(
-				"amstore.ambari.cluster.url");
+	public static AmbariEndpoint getAmbariClusterEndpoint(ViewContext viewContext) {
+		String local = viewContext.getProperties().get("amstore.ambari.cluster.url");
 
 		if (local != null && !local.isEmpty()) {
-			return new AmbariEndpoint(viewContext, viewContext.getProperties()
-					.get("amstore.ambari.cluster.url"), viewContext
-					.getProperties().get("amstore.ambari.cluster.username"),
-					viewContext.getProperties().get(
-							"amstore.ambari.cluster.password"));
+			return new AmbariEndpoint(viewContext, viewContext.getProperties().get("amstore.ambari.cluster.url"),
+					viewContext.getProperties().get("amstore.ambari.cluster.username"),
+					viewContext.getProperties().get("amstore.ambari.cluster.password"));
 		} else {
 			// Duplicate local cluster information
 			return getAmbariLocalEndpoint(viewContext);
 		}
 	}
 
-	
-	/* Calling /api/v1/clusters/<clustername> is an expensive operation (pulls all desired states),
-	 * so we try to do it just once.
-	 * Caching enabled.
-	*/
-	private JSONObject clusterdetails = null;
-	// TODO	
-
-	/* Calling /api/v1/clusters just once and filling out clusterName and clusterStackVersion
-	 * 
-	 */
-	//TODO: replace all these global variables with a proper Cluster class.
-	protected void netgetClusterInfo() throws IOException {
-		JSONObject clusterdetails = AmbariStoreHelper.readJsonFromUrl(getUrl()
-				+ "/api/v1/clusters", username, password);
-		JSONArray clusters = clusterdetails.getJSONArray("items");
-		if (clusters.length() == 0) {
-			this.clusterName = "";
-			this.clusterStackVersion = "";
-		} else {
-			JSONObject cluster = clusters.getJSONObject(0);
-			this.clusterName = cluster.getJSONObject("Clusters").getString(
-					"cluster_name");
-			String[] clusterStackInfo = cluster.getJSONObject("Clusters").getString(
-					"version").split("-");
-			this.clusterStackName = clusterStackInfo[0];
-			this.clusterStackVersion = clusterStackInfo[1];
-		}
-	}
-	
-	//TODO: replace all these global variables with a proper Cluster class.
-	protected String netgetClusterName() throws IOException {
-		if( clusterName == null)
-			netgetClusterInfo();
-		return clusterName;
-	}
-
-	//TODO: replace all these global variables with a proper Cluster class.
-	protected String netgetClusterStackName() throws IOException {
-		if( clusterStackName == null)
-			netgetClusterInfo();
-		return clusterStackName;
-	}
-	
-	//TODO: replace all these global variables with a proper Cluster class.
-	protected String netgetClusterStackVersion() throws IOException {
-		if( clusterStackVersion == null)
-			netgetClusterInfo();
-		return clusterStackVersion;
-	}
-
-	public void createViewInstance(StoreApplicationView application)
-			throws IOException {
+	public void createViewInstance(StoreApplicationView application) throws IOException {
 		createOrUpdateViewInstance(application, "create");
 	}
 
-	public void updateViewInstance(StoreApplicationView application)
-			throws IOException {
+	public void updateViewInstance(StoreApplicationView application) throws IOException {
 		createOrUpdateViewInstance(application, "update");
 	}
 
-	public void createOrUpdateViewInstance(StoreApplicationView application,
-			String operation) throws IOException {
+	public void createOrUpdateViewInstance(StoreApplicationView application, String operation) throws IOException {
 
-		String data = "[{\n" + "  \"ViewInstanceInfo\" : {\n"
-				+ "    \"label\" : \"LABEL\",\n"
-				+ "    \"description\" : \"DESCRIPTION\",\n"
-				+ "    \"properties\" : PROPERTIES \n" + "  }\n" + "}]";
+		String data = "[{\n" + "  \"ViewInstanceInfo\" : {\n" + "    \"label\" : \"LABEL\",\n"
+				+ "    \"description\" : \"DESCRIPTION\",\n" + "    \"properties\" : PROPERTIES \n" + "  }\n" + "}]";
 		data = data.replaceFirst("LABEL", application.instanceDisplayName);
 		data = data.replaceFirst("DESCRIPTION", application.description);
 
-		JSONObject properties = new JSONObject(
-				application.getDesiredInstanceProperties());
+		JSONObject properties = new JSONObject(application.getDesiredInstanceProperties());
 		data = data.replace("PROPERTIES", properties.toString());
 
-		String url = "/api/v1/views/" + application.viewName + "/versions/"
-				+ application.version + "/instances/"
+		String url = "/api/v1/views/" + application.viewName + "/versions/" + application.version + "/instances/"
 				+ application.instanceName;
 
 		LOG.debug("createOrUpdateViewInstance:" + data + "\n" + url);
 		if (operation.equals("create")) {
-			org.json.simple.JSONObject output = AmbariStoreHelper.doPostAsJson(
-					viewContext.getURLStreamProvider(), this, url, data);
+			org.json.simple.JSONObject output = AmbariStoreHelper.doPostAsJson(viewContext.getURLStreamProvider(), this,
+					url, data);
 		} else {
-			org.json.simple.JSONObject output = AmbariStoreHelper.doPutAsJson(
-					viewContext.getURLStreamProvider(), this, url, data);
+			org.json.simple.JSONObject output = AmbariStoreHelper.doPutAsJson(viewContext.getURLStreamProvider(), this,
+					url, data);
 		}
 		// TODO: check the output
 	}
 
 	public void deleteViewInstance(StoreApplicationView application) {
 
-		String url = "/api/v1/views/" + application.getViewName()
-				+ "/versions/" + application.getVersion() + "/instances/"
-				+ application.getInstanceName();
+		String url = "/api/v1/views/" + application.getViewName() + "/versions/" + application.getVersion()
+				+ "/instances/" + application.getInstanceName();
 
 		LOG.debug("Attempting to delete: '" + url);
 		curlDelete(url);
 	}
 
-	public void startService(StoreApplicationService applicationService ){
+	public void startService(StoreApplicationService applicationService) throws IOException {
 		String url = this.getClusterApiEndpoint() + "/services/" + applicationService.getServiceName();
 
-		String data = "{\"RequestInfo\": {\"context\" :\"Stop " + 
-				applicationService.getServiceName() + 
-				" via REST\"}, \"Body\": {\"ServiceInfo\": {\"state\": \"STARTED\"}}}";
-		
+		String data = "{\"RequestInfo\": {\"context\" :\"Stop " + applicationService.getServiceName()
+				+ " via REST\"}, \"Body\": {\"ServiceInfo\": {\"state\": \"STARTED\"}}}";
+
 		LOG.debug("Attempting to start: '" + url);
-		curlPut(url,data);
+		curlPut(url, data);
 	}
-	
-	public String stopService(StoreApplicationService applicationService ){
+
+	public String stopService(StoreApplicationService applicationService) throws IOException {
 		String url = this.getClusterApiEndpoint() + "/services/" + applicationService.getServiceName();
 
-		String data = "{\"RequestInfo\": {\"context\" :\"Stop " + 
-				applicationService.getServiceName() + 
-				" via REST\"}, \"Body\": {\"ServiceInfo\": {\"state\": \"INSTALLED\"}}}";
-		
+		String data = "{\"RequestInfo\": {\"context\" :\"Stop " + applicationService.getServiceName()
+				+ " via REST\"}, \"Body\": {\"ServiceInfo\": {\"state\": \"INSTALLED\"}}}";
+
 		LOG.debug("Attempting to stop: '" + url);
-		return curlPut(url,data);
+		return curlPut(url, data);
 	}
-	
+
 	private void waitForCompletion(String response, int timeout) {
 		try {
-			JSONObject json = new JSONObject( response );
+			JSONObject json = new JSONObject(response);
 			String url = json.getString("href") + "?fields=tasks/Tasks/*";
-			
+
 			boolean completed = false;
-			while( timeout >= 0 && ! completed ){
-				completed=true;
+			while (timeout >= 0 && !completed) {
+				completed = true;
 				String tasklistjson = this.curlGet(url);
 				JSONArray tasks = new JSONObject(tasklistjson).getJSONArray("tasks");
-				for (int i = 0; i < tasks .length(); i++) {
-					String status = tasks.getJSONObject(i)
-							.getJSONObject("Tasks")
-							.getString("status");
-					if(! status.equals("COMPLETED") )
+				for (int i = 0; i < tasks.length(); i++) {
+					String status = tasks.getJSONObject(i).getJSONObject("Tasks").getString("status");
+					if (!status.equals("COMPLETED"))
 						completed = false;
 				}
-				Thread.sleep(1000);  
-				timeout --;
+				Thread.sleep(1000);
+				timeout--;
 			}
-		} catch( IOException e ){
+		} catch (IOException e) {
 		} catch (InterruptedException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
-		}	
-		
+		}
+
 	}
 
-	public List<String> getServiceComponents(StoreApplicationService applicationService ) throws IOException {
+	public List<String> getServiceComponents(StoreApplicationService applicationService) throws IOException {
 		List<String> componentUris = new LinkedList<String>();
-		String url = this.getClusterApiEndpoint() + 
-				"/services/" + 
-				applicationService.getServiceName() +
-				"/components";
-		JSONObject json = new JSONObject( curlGet(url) );
+		String url = this.getClusterApiEndpoint() + "/services/" + applicationService.getServiceName() + "/components";
+		JSONObject json = new JSONObject(curlGet(url));
 		JSONArray items = json.getJSONArray("items");
 		for (int i = 0; i < items.length(); i++) {
 			componentUris.add(items.getJSONObject(i).getString("href"));
 		}
 		return componentUris;
 	}
-	public void deleteServiceComponent( String componentUri ){
-		curlDelete( componentUri );
-	}
-	
-	public void deleteServiceInstance(StoreApplicationService applicationService) {
-		String url = this.getClusterApiEndpoint() + 
-				"/services/" + 
-				applicationService.getServiceName();
-		curlDelete (url);
+
+	protected void deleteServiceComponent(String componentUri) {
+		curlDelete(componentUri);
 	}
 
-	
-	public String getActiveStackName() throws IOException {
-		return netgetClusterStackName();
-	}
-	
-	public String getActiveStackVersion() throws IOException {
-		return netgetClusterStackVersion();
+	protected void deleteServiceInstanceBase(StoreApplicationService applicationService) throws IOException {
+		String url = this.getClusterApiEndpoint() + "/services/" + applicationService.getServiceName();
+		curlDelete(url);
 	}
 
+	public void createServiceInstance(StoreApplicationService applicationService) throws IOException {
+		throw new NotImplementedException("Not implemented: createServiceInstance");
 
-	protected String getServicesFolder() throws IOException {
-		return "/var/lib/ambari-server/resources/stacks/"
-				+ getActiveStackName() + "/"
-				+ getActiveStackVersion() + "/services";
-	}
-
-	public void createService(StoreApplicationService applicationService) throws IOException {
-		throw new NotImplementedException("Not implemented: createService");
-		
-		// Create service 
+		// Create service
 		// createServiceInstance(applicationService);
-		//  $CURL -H "X-Requested-By: $agent" --silent -X POST -d '[ { "ServiceInfo" : { "service_name": "STOREAGENT"	  } } ] ' http://localhost:8080/api/v1/clusters/$CLUSTER_NAME/services 
-		//curl -u admin:admin -X POST -H "X-Requested-By: ambari" http://localhost:8080/api/v1/clusters/$CLUSTER/services/SOLR
+		// $CURL -H "X-Requested-By: $agent" --silent -X POST -d '[ {
+		// "ServiceInfo" : { "service_name": "STOREAGENT" } } ] '
+		// http://localhost:8080/api/v1/clusters/$CLUSTER_NAME/services
+		// curl -u admin:admin -X POST -H "X-Requested-By: ambari"
+		// http://localhost:8080/api/v1/clusters/$CLUSTER/services/SOLR
 
-		
 		// Create all service components
-		// $CURL -H "X-Requested-By: $agent" --silent -X POST  http://localhost:8080/api/v1/clusters/$CLUSTER_NAME/services/STOREAGENT/components/STORE_CLIENT
-		//curl -u admin:admin -X POST -H "X-Requested-By: ambari" http://localhost:8080/api/v1/clusters/$CLUSTER/services/SOLR/components/SOLR_MASTER
+		// $CURL -H "X-Requested-By: $agent" --silent -X POST
+		// http://localhost:8080/api/v1/clusters/$CLUSTER_NAME/services/STOREAGENT/components/STORE_CLIENT
+		// curl -u admin:admin -X POST -H "X-Requested-By: ambari"
+		// http://localhost:8080/api/v1/clusters/$CLUSTER/services/SOLR/components/SOLR_MASTER
 
-		
 		// Create all Host components
-		//  $CURL -H "X-Requested-By: $agent" --silent -X POST http://localhost:8080/api/v1/clusters/$CLUSTER_NAME/hosts/$FQDN/host_components/STORE_CLIENT
-		
+		// $CURL -H "X-Requested-By: $agent" --silent -X POST
+		// http://localhost:8080/api/v1/clusters/$CLUSTER_NAME/hosts/$FQDN/host_components/STORE_CLIENT
+
 		// Install all host components
 		// requestServiceInstall( applicationService )
-		//$CURL -H "X-Requested-By: $agent" --silent -X PUT -d '[ { "RequestInfo": { "context": "Install Store Agent Client" }, "Body" : { "ServiceInfo": { "state": "INSTALLED" }	  } } ] ' http://localhost:8080/api/v1/clusters/$CLUSTER_NAME/services/STOREAGENT 
-		
+		// $CURL -H "X-Requested-By: $agent" --silent -X PUT -d '[ {
+		// "RequestInfo": { "context": "Install Store Agent Client" }, "Body" :
+		// { "ServiceInfo": { "state": "INSTALLED" } } } ] '
+		// http://localhost:8080/api/v1/clusters/$CLUSTER_NAME/services/STOREAGENT
+
 		// Start service
-		//startService( applicationService );
+		// startService( applicationService );
 
 	}
 
-	
-	public void deleteService(StoreApplicationService applicationService) throws IOException {
+	/*
+	 * Delete the instance of a service. This does not remove the packages on
+	 * disk. State machine: reverts to "Available" state.
+	 */
+	public void deleteServiceInstance(StoreApplicationService applicationService) throws IOException {
 
 		String response = null;
-		// Remove packages from disk on all nodes
-		// TODO
 
 		// Stop service
-		response = stopService( applicationService );
-		waitForCompletion( response, 30 );
+		response = stopService(applicationService);
+		waitForCompletion(response, 30);
 
 		// Delete all service components
-		List<String> components = getServiceComponents( applicationService );
-		for( String component: components ){
-			deleteServiceComponent( component );
+		List<String> components = getServiceComponents(applicationService);
+		for (String component : components) {
+			deleteServiceComponent(component);
 		}
 
 		// Delete service itself
-		deleteServiceInstance(applicationService);
+		deleteServiceInstanceBase(applicationService);
 	}
 
 	/*
@@ -385,17 +337,15 @@ public class AmbariEndpoint extends Endpoint {
 	// This function calls the Service for postInstallTasks
 	/*
 	 * $CURL -H "X-Requested-By: $agent" -X POST
-	 * 'http://localhost:8080/api/v1/views/AMBARI-STORE/versions/0.1.0/instances/store/resources/taskmanager/postinstalltasks/execute'
+	 * 'http://localhost:8080/api/v1/views/AMBARI-STORE/versions/0.1.0/instances
+	 * /store/resources/taskmanager/postinstalltasks/execute'
 	 */
 	public String callExecutePostInstallTasks(MainStoreApplication application) {
 
-		String url = "/api/v1/views/" + application.viewName + "/versions/"
-				+ application.version + "/instances/"
-				+ application.instanceName
-				+ "/resources/taskmanager/postinstalltasks/execute";
+		String url = "/api/v1/views/" + application.viewName + "/versions/" + application.version + "/instances/"
+				+ application.instanceName + "/resources/taskmanager/postinstalltasks/execute";
 
-		return AmbariStoreHelper.doPost(viewContext.getURLStreamProvider(),
-				this, url, "");
+		return AmbariStoreHelper.doPost(viewContext.getURLStreamProvider(), this, url, "");
 	}
 
 	@Override
@@ -419,62 +369,122 @@ public class AmbariEndpoint extends Endpoint {
 	}
 
 	public String curlDelete(String url) throws ServiceFormattedException {
-		return AmbariStoreHelper.doDelete(this.viewContext.getURLStreamProvider(),
-				this, url);
+		return AmbariStoreHelper.doDelete(this.viewContext.getURLStreamProvider(), this, url);
 	}
+
 	public String curlPost(String url, String data) throws ServiceFormattedException {
-		return AmbariStoreHelper.doPost(this.viewContext.getURLStreamProvider(),
-				this, url, data);
+		return AmbariStoreHelper.doPost(this.viewContext.getURLStreamProvider(), this, url, data);
 	}
+
 	public String curlPut(String url, String data) throws ServiceFormattedException {
-		return AmbariStoreHelper.doPut(this.viewContext.getURLStreamProvider(),
-				this, url, data);
+		return AmbariStoreHelper.doPut(this.viewContext.getURLStreamProvider(), this, url, data);
 	}
+
 	public String curlGet(String url) throws IOException {
 		return AmbariStoreHelper.readStringFromUrl(url, this.getUsername(), this.getPassword());
 	}
 
-	// Only makes sense in the context of an non-Views Ambari
-	// WARNING: NOT FUNCTIONAL, missing version.
 	/*
-	 * public Map<String, StoreApplicationService> getInstalledServices() throws
-	 * IOException { Map<String, StoreApplicationService> installedApplications
-	 * = new TreeMap<String, StoreApplicationService>();
-	 * 
-	 * String servicesUrl = getClusterApiEndpoint() + "/services";
-	 * AmbariStoreHelper h = new AmbariStoreHelper();
-	 * 
-	 * JSONObject servicesJson = AmbariStoreHelper.readJsonFromUrl(servicesUrl,
-	 * username, password); JSONArray items = h._a(servicesJson, "items");
-	 * 
-	 * for (int j = 0; j < items.length(); j++) { JSONObject serviceInfo =
-	 * h._o(items.getJSONObject(j), "ServiceInfo"); String serviceName =
-	 * h._s(serviceInfo, "service_name"); // TODO: get the version, then call
-	 * Store to get corresponding application.
-	 * //installedApplications.put(serviceName,
-	 * newStoreApplicationService(serviceName)); }
-	 * 
-	 * return installedApplications; }
+	 * This is very expensive. We have to query the services one by one to
+	 * obtain the service_version.
 	 */
+	protected Map<String, StoreApplicationService> netgetAvailableServices() throws IOException {
 
-	// Indexed by serviceName
-	public Set<String> getListInstalledServiceNames() throws IOException {
-		Set<String> serviceNames = new HashSet<String>();
+		Map<String, StoreApplicationService> storeApplicationServices = new HashMap<String, StoreApplicationService>();
 
-		String servicesUrl = getClusterApiEndpoint() + "/services";
+		String servicesUrl = this.getClusterStackApiEndpoint();
 		AmbariStoreHelper h = new AmbariStoreHelper();
 
-		JSONObject servicesJson = AmbariStoreHelper.readJsonFromUrl(
-				servicesUrl, username, password);
-		JSONArray items = h._a(servicesJson, "items");
+		JSONObject servicesJson = AmbariStoreHelper.readJsonFromUrl(servicesUrl, username, password);
+		JSONArray services = h._a(servicesJson, "items");
 
-		for (int j = 0; j < items.length(); j++) {
-			JSONObject serviceInfo = h
-					._o(items.getJSONObject(j), "ServiceInfo");
+		for (int j = 0; j < services.length(); j++) {
+			JSONObject serviceInfo = h._o(services.getJSONObject(j), "StackServices");
+			String serviceName = h._s(serviceInfo, "service_name");
+
+			// Now that we have the serviceName, query them one by one to get
+			// the version
+			StoreApplicationService app = netgetAvailableService(serviceName);
+			storeApplicationServices.put(serviceName, app);
+		}
+		return storeApplicationServices;
+	}
+
+	// Indexed by serviceName
+	// This is all the services available in the stack
+	protected Map<String, StoreApplicationService> availableClusterServices;
+
+	/*
+	 * Only makes sense in the context of an non-Views Ambari Indexed by
+	 * serviceName
+	 */
+	public Map<String, StoreApplicationService> getAvailableServices() throws IOException {
+
+		if (availableClusterServices == null)
+			availableClusterServices = netgetAvailableServices();
+
+		return availableClusterServices;
+	}
+
+	public StoreApplicationService netgetAvailableService(String serviceName) throws IOException {
+		StoreApplicationFactory appFactory = new StoreApplicationFactory();
+		String serviceUrl = this.getClusterStackApiEndpoint() + "/" + serviceName;
+		AmbariStoreHelper h = new AmbariStoreHelper();
+
+		JSONObject serviceJson = AmbariStoreHelper.readJsonFromUrl(serviceUrl, username, password);
+		JSONObject serviceInfo = h._o(serviceJson, "StackServices");
+		String serviceNameCheck = h._s(serviceInfo, "service_name");
+		String serviceVersion = h._s(serviceInfo, "service_version");
+
+		return appFactory.getBareboneStoreApplicationService(serviceName, serviceVersion);
+
+	}
+
+	public Set<StoreApplicationService> getInstalledServices() throws IOException {
+		Set<String> serviceNames = netgetInstantiatedServiceNames();
+		Map<String, StoreApplicationService> availableServices = getAvailableServices();
+		Set<StoreApplicationService> instantiatedServices = new HashSet<StoreApplicationService>();
+
+		for (Map.Entry<String, StoreApplicationService> e : availableServices.entrySet()) {
+			if (serviceNames.contains(e.getKey()))
+				instantiatedServices.add(e.getValue());
+		}
+
+		return instantiatedServices;
+	}
+
+	protected Set<String> netgetInstantiatedServiceNames() throws IOException {
+
+		Set<String> serviceNames = new HashSet<String>();
+
+		String servicesUrl = this.getClusterServicesApiEndpoint();
+		AmbariStoreHelper h = new AmbariStoreHelper();
+
+		JSONObject servicesJson = AmbariStoreHelper.readJsonFromUrl(servicesUrl, username, password);
+		JSONArray services = h._a(servicesJson, "items");
+
+		for (int j = 0; j < services.length(); j++) {
+			JSONObject serviceInfo = h._o(services.getJSONObject(j), "ServiceInfo");
 			String serviceName = h._s(serviceInfo, "service_name");
 			serviceNames.add(serviceName);
 		}
 		return serviceNames;
+	}
+
+	public boolean isAdmin(String username) throws IOException {
+		return netgetIsAdmin(username);
+	}
+
+	protected boolean netgetIsAdmin(String username) throws IOException {
+
+		String userUrl = this.getUrl() + "/api/v1/users/" + username;
+		AmbariStoreHelper h = new AmbariStoreHelper();
+
+		JSONObject response = AmbariStoreHelper.readJsonFromUrl(userUrl, this.username, this.password);
+		JSONObject userInfo = h._o(response, "Users");
+
+		boolean adminstatus = h._b(userInfo, "admin");
+		return adminstatus;
 	}
 
 	public class ServiceConfiguration {
@@ -489,15 +499,13 @@ public class AmbariEndpoint extends Endpoint {
 
 		public void set(String key, String value) {
 			if (key == null)
-				throw new RuntimeException(
-						"Call to ServiceConfiguration with null key");
+				throw new RuntimeException("Call to ServiceConfiguration with null key");
 			if (value == null)
-				throw new RuntimeException(
-						"Call to ServiceConfiguration with null value");
+				throw new RuntimeException("Call to ServiceConfiguration with null value");
 			configuration.put(key, value);
 		}
-		
-		public Map<String, String> getMap(){
+
+		public Map<String, String> getMap() {
 			return configuration;
 		}
 
@@ -516,71 +524,60 @@ public class AmbariEndpoint extends Endpoint {
 		public void set(String key, ServiceConfiguration value) {
 			clusterConfiguration.put(key, value);
 		}
-		
-		public Map<String, ServiceConfiguration> getMap(){
+
+		public Map<String, ServiceConfiguration> getMap() {
 			return clusterConfiguration;
 		}
 
 	}
 
-	public ServicesConfiguration getServicesConfiguration()
-			throws IOException {
-		if ( servicesConfiguration == null ) {
+	public ServicesConfiguration getServicesConfiguration() throws IOException {
+		if (servicesConfiguration == null) {
 			servicesConfiguration = netgetServicesConfiguration();
 		}
 		return servicesConfiguration;
-			
+
 	}
-	
-	protected ServicesConfiguration netgetServicesConfiguration()
-			throws IOException {
+
+	protected ServicesConfiguration netgetServicesConfiguration() throws IOException {
 		ServicesConfiguration servicesConfiguration = new ServicesConfiguration();
 
-//		AmbariStoreHelper h = new AmbariStoreHelper();
+		// AmbariStoreHelper h = new AmbariStoreHelper();
 
 		// Populate all settings
-		String url = this.getClusterApiEndpoint()
-				+ "?fields=Clusters/desired_configs";
+		String url = this.getClusterApiEndpoint() + "?fields=Clusters/desired_configs";
 
-		JSONObject configResponse = AmbariStoreHelper.readJsonFromUrl(url,
-				username, password);
-//		JSONObject configIndex = h._o(configResponse, "Clusters");
-//		JSONObject configurations = h._o(configIndex, "desired_configs");
-		
-		JSONObject desiredConfigs = configResponse
-				.getJSONObject("Clusters")
-				.getJSONObject("desired_configs");
+		JSONObject configResponse = AmbariStoreHelper.readJsonFromUrl(url, username, password);
+		// JSONObject configIndex = h._o(configResponse, "Clusters");
+		// JSONObject configurations = h._o(configIndex, "desired_configs");
+
+		JSONObject desiredConfigs = configResponse.getJSONObject("Clusters").getJSONObject("desired_configs");
 		Iterator<?> keys = desiredConfigs.keys();
 		while (keys.hasNext()) {
 			String key = (String) keys.next();
 
-				if (desiredConfigs.get(key) instanceof JSONObject) {
-					String configType = key;
-					String tag = ((JSONObject) desiredConfigs.get(key)).getString("tag");
-					ServiceConfiguration serviceConfiguration = netgetServiceConfiguration(
-							configType, tag);
-					servicesConfiguration.set(key, serviceConfiguration);
-				}
+			if (desiredConfigs.get(key) instanceof JSONObject) {
+				String configType = key;
+				String tag = ((JSONObject) desiredConfigs.get(key)).getString("tag");
+				ServiceConfiguration serviceConfiguration = netgetServiceConfiguration(configType, tag);
+				servicesConfiguration.set(key, serviceConfiguration);
+			}
 		}
 		return servicesConfiguration;
 	}
 
-	protected ServiceConfiguration netgetServiceConfiguration(
-			String configType, String tag) throws IOException {
+	protected ServiceConfiguration netgetServiceConfiguration(String configType, String tag) throws IOException {
 
 		ServiceConfiguration serviceConfiguration = new ServiceConfiguration();
 
 		// http://lake01.cloud.hortonworks.com:8080/api/v1/clusters/LAKE/configurations?type=capacity-scheduler&tag=version1423613079534
-		String url = this.getClusterApiEndpoint() + "/configurations?type="
-				+ configType + "&tag=" + tag;
+		String url = this.getClusterApiEndpoint() + "/configurations?type=" + configType + "&tag=" + tag;
 
-		JSONObject configResponse = AmbariStoreHelper.readJsonFromUrl(url,
-				username, password);
+		JSONObject configResponse = AmbariStoreHelper.readJsonFromUrl(url, username, password);
 		JSONObject properties = null;
-		try { 
-			properties = configResponse.getJSONArray("items")
-				.getJSONObject(0).getJSONObject("properties");
-		} catch(org.json.JSONException e){
+		try {
+			properties = configResponse.getJSONArray("items").getJSONObject(0).getJSONObject("properties");
+		} catch (org.json.JSONException e) {
 			return serviceConfiguration;
 		}
 
@@ -593,4 +590,28 @@ public class AmbariEndpoint extends Endpoint {
 		}
 		return serviceConfiguration;
 	}
+
+	/*
+	 * Calling /api/v1/clusters just once and filling out clusterName and
+	 * clusterStackVersion
+	 * 
+	 */
+	// TODO: replace all these global variables with a proper Cluster class.
+	protected void netgetClusterInfo() throws IOException {
+		JSONObject clusterdetails = AmbariStoreHelper.readJsonFromUrl(getUrl() + "/api/v1/clusters", username,
+				password);
+		JSONArray clusters = clusterdetails.getJSONArray("items");
+		if (clusters.length() == 0) {
+			this.clusterName = "";
+			this.clusterStackName = "";
+			this.clusterStackVersion = "";
+		} else {
+			JSONObject cluster = clusters.getJSONObject(0);
+			this.clusterName = cluster.getJSONObject("Clusters").getString("cluster_name");
+			String[] clusterStackInfo = cluster.getJSONObject("Clusters").getString("version").split("-");
+			this.clusterStackName = clusterStackInfo[0];
+			this.clusterStackVersion = clusterStackInfo[1];
+		}
+	}
+
 } // end class

@@ -63,8 +63,9 @@ public class StoreApplicationFactory {
 	}
 
 
-	// TODO: really bare bones until we can access the installed version
-	public  StoreApplicationService getBareboneStoreApplicationService ( String serviceName ) {
-		return new StoreApplicationService( serviceName );
+	// TODO: This actually represents an *instance* of a service
+	public  StoreApplicationService getBareboneStoreApplicationService ( String serviceName,
+			String serviceVersion) {
+		return new StoreApplicationService( serviceName, serviceVersion );
 	}
 }

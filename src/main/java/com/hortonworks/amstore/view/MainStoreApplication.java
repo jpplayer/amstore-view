@@ -1,12 +1,10 @@
 package com.hortonworks.amstore.view;
 
-import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URLEncoder;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -16,9 +14,7 @@ import java.util.TreeMap;
 import java.util.Map.Entry;
 
 import org.apache.ambari.view.ViewContext;
-import org.apache.ambari.view.ViewDefinition;
 import org.apache.ambari.view.ViewInstanceDefinition;
-import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang.NotImplementedException;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -31,8 +27,7 @@ import com.hortonworks.amstore.view.StoreException.CODE;
 import com.hortonworks.amstore.view.utils.ServiceFormattedException;
 
 public class MainStoreApplication extends StoreApplicationView {
-	private final static Logger LOG = LoggerFactory
-			.getLogger(MainStoreApplication.class);
+	private final static Logger LOG = LoggerFactory.getLogger(MainStoreApplication.class);
 
 	protected AmbariEndpoint ambariViews = null;
 	protected AmbariEndpoint ambariCluster = null;
@@ -47,8 +42,7 @@ public class MainStoreApplication extends StoreApplicationView {
 		// TODO: Use Setters rather than direct variables.
 		try {
 			Properties properties = new Properties();
-			InputStream stream = getClass().getClassLoader()
-					.getResourceAsStream("store.properties");
+			InputStream stream = getClass().getClassLoader().getResourceAsStream("store.properties");
 			properties.load(stream);
 
 			app_id = properties.getProperty("mainStoreAppId");
@@ -61,13 +55,13 @@ public class MainStoreApplication extends StoreApplicationView {
 			LOG.debug("IOException in mainStoreApplication constructor.");
 		}
 		initAmbariEndpoints();
+		LOG.info("Amstore init complete");
 	}
 
 	private String parseSpecials(String in) {
 		if (in == null)
 			return null;
-		String replacement = in.replace("{{username}}", "${username}")
-				.replace("{{viewName}}", "${viewName}")
+		String replacement = in.replace("{{username}}", "${username}").replace("{{viewName}}", "${viewName}")
 				.replace("{{instanceName}}", "${instanceName}");
 		return replacement;
 	}
@@ -78,8 +72,8 @@ public class MainStoreApplication extends StoreApplicationView {
 	 * ${viewName} {{instanceName}} maps to ${instanceName}
 	 */
 	// TODO: unsafe from a security standpoint. Too easy to get passwords.
-	public Map<String, String> getMappedProperties(StoreApplication application)
-			throws StoreException {
+	// TODO: completely replace with new API to configure views.
+	public Map<String, String> getMappedProperties(StoreApplication application) throws StoreException, IOException {
 		Map<String, String> mapped = new TreeMap<String, String>();
 
 		// Mappings are mostly the configured properties
@@ -92,22 +86,15 @@ public class MainStoreApplication extends StoreApplicationView {
 
 		// Views Ambari
 		amstoreMappings.put("amstore.ambari.views.url", ambariViews.getUrl());
-		amstoreMappings.put("amstore.ambari.views.clusterurl",
-				ambariViews.getClusterApiEndpoint());
-		amstoreMappings.put("amstore.ambari.views.username",
-				ambariViews.getUsername());
-		amstoreMappings.put("amstore.ambari.views.password",
-				ambariViews.getPassword());
+		amstoreMappings.put("amstore.ambari.views.clusterurl", ambariViews.getClusterApiEndpoint());
+		amstoreMappings.put("amstore.ambari.views.username", ambariViews.getUsername());
+		amstoreMappings.put("amstore.ambari.views.password", ambariViews.getPassword());
 
 		// Cluster Ambari
-		amstoreMappings.put("amstore.ambari.cluster.url",
-				ambariCluster.getUrl());
-		amstoreMappings.put("amstore.ambari.cluster.clusterurl",
-				ambariCluster.getClusterApiEndpoint());
-		amstoreMappings.put("amstore.ambari.cluster.username",
-				ambariCluster.getUsername());
-		amstoreMappings.put("amstore.ambari.cluster.password",
-				ambariCluster.getPassword());
+		amstoreMappings.put("amstore.ambari.cluster.url", ambariCluster.getUrl());
+		amstoreMappings.put("amstore.ambari.cluster.clusterurl", ambariCluster.getClusterApiEndpoint());
+		amstoreMappings.put("amstore.ambari.cluster.username", ambariCluster.getUsername());
+		amstoreMappings.put("amstore.ambari.cluster.password", ambariCluster.getPassword());
 
 		/*
 		 * Old style: hardcode mappings in store. We no longer do this. for
@@ -125,8 +112,7 @@ public class MainStoreApplication extends StoreApplicationView {
 		 */
 		try {
 
-			for (Entry<String, String> e : application.getBackendProperties()
-					.entrySet()) {
+			for (Entry<String, String> e : application.getBackendProperties().entrySet()) {
 
 				// if e.getValue() needs replacing
 				String field = e.getValue();
@@ -136,24 +122,20 @@ public class MainStoreApplication extends StoreApplicationView {
 					// Calls the store the first time. Keeping it here ensures
 					// it only
 					// gets called if we really have to. Not efficient.
-					ServicesConfiguration servicesConfiguration = getAmbariCluster()
-							.getServicesConfiguration();
+					ServicesConfiguration servicesConfiguration = getAmbariCluster().getServicesConfiguration();
 					String config = field.split("\\.")[1];
 					String property = field.split("\\.", 3)[2];
-					String replacement = servicesConfiguration.get(config).get(
-							property);
+					String replacement = servicesConfiguration.get(config).get(property);
 					mapped.put(e.getKey(), parseSpecials(replacement));
 				} else if (field.startsWith("amstore.")) {
-					mapped.put(e.getKey(),
-							parseSpecials(amstoreMappings.get(e.getValue())));
+					mapped.put(e.getKey(), parseSpecials(amstoreMappings.get(e.getValue())));
 				} else {
 					mapped.put(e.getKey(), parseSpecials(e.getValue()));
 				}
 
 			}
 		} catch (IOException e) {
-			throw new StoreException(
-					"Unable to obtain Ambari services properties.");
+			throw new StoreException("Unable to obtain Ambari services properties.");
 		}
 		return mapped;
 	}
@@ -166,24 +148,24 @@ public class MainStoreApplication extends StoreApplicationView {
 		initLocalEndpoint();
 		initClusterEndpoint();
 	}
-	
+
 	/*
 	 * Public method that should be called to reload the View configuration.
 	 */
 	public void reloadConfiguration() {
 		// Update Store configuration
 		initBackendStoreEndpoint();
-		
+
 		// Update Ambari endpoints
 		initAmbariEndpoints();
 	}
 
-	protected void initBackendStoreEndpoint(){
-		// TODO: implement backend store credentials instead of anonymous binding
-		storeEndpoint = new BackendStoreEndpoint(getBackendStoreUrl(),
-				null, null);
+	protected void initBackendStoreEndpoint() {
+		// TODO: implement backend store credentials instead of anonymous
+		// binding
+		storeEndpoint = new BackendStoreEndpoint(getBackendStoreUrl(), null, null);
 	}
-	
+
 	protected void initLocalEndpoint() {
 		ambariViews = AmbariEndpoint.getAmbariLocalEndpoint(viewContext);
 	}
@@ -201,13 +183,12 @@ public class MainStoreApplication extends StoreApplicationView {
 	}
 
 	/*
-	 * Returns a cached backend store endpoint.
-	 * TODO: implement store credentials 
+	 * Returns a cached backend store endpoint. TODO: implement store
+	 * credentials
 	 */
 	public BackendStoreEndpoint getStoreEndpoint() {
 		if (storeEndpoint == null)
-			storeEndpoint = new BackendStoreEndpoint(getBackendStoreUrl(),
-					null, null);
+			storeEndpoint = new BackendStoreEndpoint(getBackendStoreUrl(), null, null);
 		return storeEndpoint;
 	}
 
@@ -216,8 +197,7 @@ public class MainStoreApplication extends StoreApplicationView {
 	}
 
 	public AmbariEndpoint getAmbariCluster() {
-		AmbariEndpoint ambariClusterconfig = AmbariEndpoint
-				.getAmbariClusterEndpoint(viewContext);
+		AmbariEndpoint ambariClusterconfig = AmbariEndpoint.getAmbariClusterEndpoint(viewContext);
 		if (!ambariCluster.equals(ambariClusterconfig)) {
 			// TODO: This is really sneaky.
 			// We are actually resetting clusterName to null.
@@ -227,8 +207,7 @@ public class MainStoreApplication extends StoreApplicationView {
 	}
 
 	public AmbariEndpoint getAmbariViews() {
-		AmbariEndpoint ambariViewsConfig = AmbariEndpoint
-				.getAmbariLocalEndpoint(viewContext);
+		AmbariEndpoint ambariViewsConfig = AmbariEndpoint.getAmbariLocalEndpoint(viewContext);
 		if (!ambariViews.equals(ambariViewsConfig)) {
 			// TODO: This is really sneaky. -- WARNING
 			// We are actually resetting clusterName to null.
@@ -249,8 +228,7 @@ public class MainStoreApplication extends StoreApplicationView {
 	// Indexed by instanceName
 	public Map<String, ViewInstanceDefinition> getInstancedViews() {
 		Map<String, ViewInstanceDefinition> installedApplications = new TreeMap<String, ViewInstanceDefinition>();
-		Collection<ViewInstanceDefinition> viewDefinitions = getViewContext()
-				.getViewInstanceDefinitions();
+		Collection<ViewInstanceDefinition> viewDefinitions = getViewContext().getViewInstanceDefinitions();
 		for (ViewInstanceDefinition instance : viewDefinitions) {
 			installedApplications.put(instance.getInstanceName(), instance);
 		}
@@ -262,50 +240,39 @@ public class MainStoreApplication extends StoreApplicationView {
 	public Map<String, StoreApplicationView> getInstalledViews() {
 		Map<String, StoreApplicationView> installedApplications = new TreeMap<String, StoreApplicationView>();
 
-		Collection<ViewInstanceDefinition> viewDefinitions = getViewContext()
-				.getViewInstanceDefinitions();
+		Collection<ViewInstanceDefinition> viewDefinitions = getViewContext().getViewInstanceDefinitions();
 		for (ViewInstanceDefinition instance : viewDefinitions) {
 			StoreApplicationView installedBareView = new StoreApplicationFactory()
 					.getBareboneStoreApplicationView(instance);
-			installedApplications.put(installedBareView.getCanonicalName(),
-					installedBareView);
+			installedApplications.put(installedBareView.getCanonicalName(), installedBareView);
 		}
 		return installedApplications;
 	}
 
-	// TODO WARNING: we are only the service_name NOT version
-	// Indexed by canonicalName
+	// Indexed by canonicalName here
 	// Note: The returned value is not fully instantiated
-	public Map<String, StoreApplicationService> getInstalledServices()
-			throws IOException {
+	public Map<String, StoreApplicationService> getInstalledServices() throws IOException {
 		Map<String, StoreApplicationService> installedServices = new TreeMap<String, StoreApplicationService>();
+		Set<StoreApplicationService> instantiatedServices = getAmbariCluster().getInstalledServices();
 
-		// TODO: replace with something that also returns VERSION in the future
-		Set<String> serviceNames = getAmbariCluster()
-				.getListInstalledServiceNames();
-
-		for (String serviceName : serviceNames) {
-			StoreApplicationService serviceBare = new StoreApplicationFactory()
-					.getBareboneStoreApplicationService(serviceName);
-
-			installedServices.put(serviceBare.getCanonicalName(), serviceBare);
+		// re-index by canonical name
+		for (StoreApplicationService service : instantiatedServices) {
+			installedServices.put(service.getCanonicalName(), service);
 		}
+
 		return installedServices;
 	}
 
 	// Indexed by canonicalName
-	public Map<String, StoreApplication> getInstalledApplications()
-			throws IOException {
+	public Map<String, StoreApplication> getInstalledApplications() throws IOException {
 		Map<String, StoreApplication> applicationStubs = new TreeMap<String, StoreApplication>();
 
 		// Add Views
-		for (Entry<String, StoreApplicationView> e : getInstalledViews()
-				.entrySet()) {
+		for (Entry<String, StoreApplicationView> e : getInstalledViews().entrySet()) {
 			applicationStubs.put(e.getKey(), e.getValue());
 		}
 		// Add Services
-		for (Entry<String, StoreApplicationService> e : getInstalledServices()
-				.entrySet()) {
+		for (Entry<String, StoreApplicationService> e : getInstalledServices().entrySet()) {
 			applicationStubs.put(e.getKey(), e.getValue());
 		}
 		// Add assemblies
@@ -315,100 +282,74 @@ public class MainStoreApplication extends StoreApplicationView {
 	}
 
 	// Fully populated
-	public StoreApplication getInstalledApplicationByAppId(String appId)
-			throws StoreException {
+	public StoreApplication getInstalledApplicationByAppId(String appId) throws StoreException {
 		/*
 		 * Get the latest version We can do this because there should always be
 		 * at least one version available even if it's a later version than the
 		 * one installed.
 		 */
 		// Efficient
-		StoreApplication latestAppAvailable = getStoreEndpoint()
-				.getAllApplicationsFromStore().get(appId);
+		StoreApplication latestAppAvailable = getStoreEndpoint().getAllApplicationsFromStore().get(appId);
 
 		if (latestAppAvailable == null) {
-			throw new StoreException(
-					"Application "
-							+ appId
-							+ " was not found in the Store. If this app is not managed by the store it cannot be deleted via the store.");
+			throw new StoreException("Application " + appId
+					+ " was not found in the Store. If this app is not managed by the store it cannot be deleted via the store.");
 		}
 
 		if (latestAppAvailable.isView()) {
-			
+
 			ViewInstanceDefinition instance = getInstalledViewInstanceByCanonicalName(
-					latestAppAvailable.getCanonicalName()
-					);
-			if( instance == null )
+					latestAppAvailable.getCanonicalName());
+			if (instance == null)
 				return null;
-			StoreApplicationView storeApplicationView = (StoreApplicationView)
-					this
-					.getStoreEndpoint()
+			StoreApplicationView storeApplicationView = (StoreApplicationView) this.getStoreEndpoint()
 					.netgetApplicationFromStoreByAppId(appId, instance.getViewDefinition().getVersion());
-			
+
 			// if we get here the application was not found.
-			if( storeApplicationView == null )
-			throw new StoreException(
-					"Application "
-							+ appId
-							+ " with version "
-							+ instance.getViewDefinition().getVersion()
-							+ " was not found in the Store. Cannot delete information on disk.");
+			if (storeApplicationView == null)
+				throw new StoreException(
+						"Application " + appId + " with version " + instance.getViewDefinition().getVersion()
+								+ " was not found in the Store. Cannot delete information on disk.");
 			return storeApplicationView;
 		} else if (latestAppAvailable.isService()) {
 			// We don't handle versions, so return the latest
 			return latestAppAvailable;
 		}
-		throw new NotImplementedException(
-				"Only Views and Services are supported.");
+		throw new NotImplementedException("Only Views and Services are supported.");
 	}
 
 	/*
-	public StoreApplication getInstalledApplicationByAppId(String appId)
-			throws IOException, StoreException {
+	 * public StoreApplication getInstalledApplicationByAppId(String appId)
+	 * throws IOException, StoreException {
+	 * 
+	 * // Efficient StoreApplication latestAppAvailable = getStoreEndpoint()
+	 * .getAllApplicationsFromStore().get(appId);
+	 * 
+	 * if (latestAppAvailable == null) { throw new StoreException(
+	 * "Application " + appId +
+	 * " was not found in the Store. If this app is not managed by the store it cannot be deleted via the store."
+	 * ); } // Get the installed version StoreApplication
+	 * installedApplicationStub = this
+	 * .getInstalledApplicationByCanonicalName(latestAppAvailable
+	 * .getCanonicalName()); if (installedApplication == null) {
+	 * 
+	 * if (latestAppAvailable.isView()) {
+	 * 
+	 * ViewInstanceDefinition instance = this.getInstancedViews().get(
+	 * latestAppAvailable.getInstanceName()); throw new StoreException(
+	 * "Application " + appId + " with version " +
+	 * instance.getViewDefinition().getVersion() +
+	 * " was not found in the Store. Cannot delete information on disk."); } }
+	 * 
+	 * return installedApplication;
+	 * 
+	 * }
+	 */
+	public ViewInstanceDefinition getInstalledViewInstanceByCanonicalName(String canonicalName) {
 
-		// Efficient
-		StoreApplication latestAppAvailable = getStoreEndpoint()
-				.getAllApplicationsFromStore().get(appId);
-
-		if (latestAppAvailable == null) {
-			throw new StoreException(
-					"Application "
-							+ appId
-							+ " was not found in the Store. If this app is not managed by the store it cannot be deleted via the store.");
-		}
-		// Get the installed version
-		StoreApplication installedApplicationStub = this
-				.getInstalledApplicationByCanonicalName(latestAppAvailable
-						.getCanonicalName());
-		if (installedApplication == null) {
-
-			if (latestAppAvailable.isView()) {
-
-				ViewInstanceDefinition instance = this.getInstancedViews().get(
-						latestAppAvailable.getInstanceName());
-				throw new StoreException(
-						"Application "
-								+ appId
-								+ " with version "
-								+ instance.getViewDefinition().getVersion()
-								+ " was not found in the Store. Cannot delete information on disk.");
-			}
-		}
-
-		return installedApplication;
-
-	}
-*/
-	public ViewInstanceDefinition getInstalledViewInstanceByCanonicalName(
-			String canonicalName) {
-
-		Collection<ViewInstanceDefinition> viewDefinitions = getViewContext()
-				.getViewInstanceDefinitions();
+		Collection<ViewInstanceDefinition> viewDefinitions = getViewContext().getViewInstanceDefinitions();
 		for (ViewInstanceDefinition instance : viewDefinitions) {
-			String canonical = "view-" + 
-					instance.getViewDefinition().getViewName() +
-					"-" +
-					instance.getInstanceName();
+			String canonical = "view-" + instance.getViewDefinition().getViewName() + "-" + instance.getInstanceName();
 			if (canonical.equals(canonicalName)) {
 				return instance;
 			}
@@ -421,16 +362,15 @@ public class MainStoreApplication extends StoreApplicationView {
 	public void installApplication(String appId) throws StoreException {
 		LOG.debug("Starting downloads.");
 
-		Map<String, StoreApplication> availableApplications = getStoreEndpoint()
-				.getAllApplicationsFromStore();
+		Map<String, StoreApplication> availableApplications = getStoreEndpoint().getAllApplicationsFromStore();
 		StoreApplication app = availableApplications.get(appId);
 		LOG.info("Starting download of application: " + app.getCanonicalName());
-		
+
 		try {
 			app.doInstallStage1(getAmbariLocal());
 			addPostInstallTask(app.uri);
-		} catch (IOException e){
-			throw new StoreException("Error installing " + app.getInstanceDisplayName(), StoreException.CODE.ERROR  );
+		} catch (IOException e) {
+			throw new StoreException("Error installing " + app.getInstanceDisplayName(), StoreException.CODE.ERROR);
 		}
 	}
 
@@ -439,42 +379,33 @@ public class MainStoreApplication extends StoreApplicationView {
 	 * complete. Assert: the view must be instantiated TODO: Refuses to
 	 * uninstall the App Store itself. Need a better way.
 	 */
-	public void uninstallApplication(String appId) throws IOException,
-			StoreException {
-		StoreApplication installedApplication = this
-				.getInstalledApplicationByAppId(appId);
+	public void uninstallApplication(String appId) throws IOException, StoreException {
+		StoreApplication installedApplication = this.getInstalledApplicationByAppId(appId);
 		if (installedApplication == null)
-			throw new StoreException("Application " + appId
-					+ "must be installed first. Cannot uninstall.", CODE.INFO);
+			throw new StoreException("Application " + appId + "must be installed first. Cannot uninstall.", CODE.INFO);
 
 		// Do not delete Store
 		if (installedApplication.isStore()) {
-			throw new StoreException(
-					"Attempted to uninstall store. Not supported.", CODE.INFO);
+			throw new StoreException("Attempted to uninstall store. Not supported.", CODE.INFO);
 		}
 		installedApplication.doUninstallStage1(this.getAmbariLocal());
 	}
 
-	public void updateApplication(String appId) throws IOException,
-			StoreException {
+	public void updateApplication(String appId) throws IOException, StoreException {
 		LOG.debug("Starting downloads for updates.");
 
-		Map<String, StoreApplication> availableApplications = getStoreEndpoint()
-				.getAllApplicationsFromStore();
+		Map<String, StoreApplication> availableApplications = getStoreEndpoint().getAllApplicationsFromStore();
 		StoreApplication newApplication = availableApplications.get(appId);
 
 		// Get the installed version
-		StoreApplication installedApplication = this
-				.getInstalledApplicationByAppId(appId);
+		StoreApplication installedApplication = this.getInstalledApplicationByAppId(appId);
 
 		if (installedApplication == null) {
-			LOG.warn("updateApplication with AppId " + appId
-					+ ". No installed application found.");
+			LOG.warn("updateApplication with AppId " + appId + ". No installed application found.");
 			return;
 		}
 
-		if (newApplication.getVersion().equals(
-				installedApplication.getVersion())) {
+		if (newApplication.getVersion().equals(installedApplication.getVersion())) {
 			// TODO: turn this into an exception and display at top.
 			LOG.warn("Can't update to same version. Use force installation instead.");
 			return;
@@ -494,18 +425,13 @@ public class MainStoreApplication extends StoreApplicationView {
 		addPostUpdateTask(newApplication.uri);
 	}
 
-	public void deinstantiateApplication(String appId) throws IOException,
-			StoreException {
+	public void deinstantiateApplication(String appId) throws IOException, StoreException {
 
 		// Get the installed version first
-		StoreApplication installedApplication = this
-				.getInstalledApplicationByAppId(appId);
-
-		String url = "";
+		StoreApplication installedApplication = this.getInstalledApplicationByAppId(appId);
 
 		if (installedApplication == null) {
-			LOG.warn("Delete request for " + appId
-					+ " failed: Application not found.");
+			LOG.warn("Delete request for " + appId + " failed: Application not found.");
 			return;
 		}
 
@@ -526,8 +452,7 @@ public class MainStoreApplication extends StoreApplicationView {
 	 * amstore.hiveserver2.authentication TODO: make sure we pull all values
 	 * from remote Ambari, eg not hardcode ports.
 	 */
-	public Map<String, String> netgetUpdatedStoreProperties()
-			throws IOException, JSONException {
+	public Map<String, String> netgetUpdatedStoreProperties() throws IOException, JSONException {
 
 		Map<String, String> amstore;
 
@@ -535,18 +460,14 @@ public class MainStoreApplication extends StoreApplicationView {
 
 		AmbariEndpoint cluster = getAmbariCluster();
 		// Validates correct access to the Hadoop cluster's Ambari
-		String baseurl = cluster.getUrl() + "/api/v1/clusters/"
-				+ cluster.getClusterName();
+		String baseurl = cluster.getUrl() + "/api/v1/clusters/" + cluster.getClusterName();
 
 		// WEBHDFS
 		try {
-			JSONObject hdfs = AmbariStoreHelper.readJsonFromUrl(baseurl
-					+ "/services/HDFS/components/NAMENODE", cluster.username,
-					cluster.password);
-			amstore.put("amstore.webhdfs.url", "webhdfs://"
-					+ hdfs.getJSONArray("host_components").getJSONObject(0)
-							.getJSONObject("HostRoles").getString("host_name")
-					+ ":50070");
+			JSONObject hdfs = AmbariStoreHelper.readJsonFromUrl(baseurl + "/services/HDFS/components/NAMENODE",
+					cluster.username, cluster.password);
+			amstore.put("amstore.webhdfs.url", "webhdfs://" + hdfs.getJSONArray("host_components").getJSONObject(0)
+					.getJSONObject("HostRoles").getString("host_name") + ":50070");
 			// leave default of blank
 			amstore.put("amstore.webhdfs.username", "");
 			// leave default of blank
@@ -556,47 +477,32 @@ public class MainStoreApplication extends StoreApplicationView {
 
 		// YARN
 		try {
-			JSONObject yarnrm = AmbariStoreHelper.readJsonFromUrl(baseurl
-					+ "/services/YARN/components/RESOURCEMANAGER",
+			JSONObject yarnrm = AmbariStoreHelper.readJsonFromUrl(baseurl + "/services/YARN/components/RESOURCEMANAGER",
 					cluster.username, cluster.password);
-			amstore.put(
-					"amstore.yarn.rm.url",
-					"http://"
-							+ yarnrm.getJSONArray("host_components")
-									.getJSONObject(0)
-									.getJSONObject("HostRoles")
-									.getString("host_name") + ":8088");
+			amstore.put("amstore.yarn.rm.url", "http://" + yarnrm.getJSONArray("host_components").getJSONObject(0)
+					.getJSONObject("HostRoles").getString("host_name") + ":8088");
 
-			JSONObject yarnats = AmbariStoreHelper.readJsonFromUrl(baseurl
-					+ "/services/YARN/components/APP_TIMELINE_SERVER",
-					cluster.username, cluster.password);
-			amstore.put("amstore.yarn.ats.url", "http://"
-					+ yarnats.getJSONArray("host_components").getJSONObject(0)
-							.getJSONObject("HostRoles").getString("host_name")
-					+ ":8188");
+			JSONObject yarnats = AmbariStoreHelper.readJsonFromUrl(
+					baseurl + "/services/YARN/components/APP_TIMELINE_SERVER", cluster.username, cluster.password);
+			amstore.put("amstore.yarn.ats.url", "http://" + yarnats.getJSONArray("host_components").getJSONObject(0)
+					.getJSONObject("HostRoles").getString("host_name") + ":8188");
 		} catch (Exception e) {
 		}
 
 		// WEBHCAT
 		try {
-			JSONObject webhcat = AmbariStoreHelper.readJsonFromUrl(baseurl
-					+ "/services/HIVE/components/WEBHCAT_SERVER",
+			JSONObject webhcat = AmbariStoreHelper.readJsonFromUrl(baseurl + "/services/HIVE/components/WEBHCAT_SERVER",
 					cluster.username, cluster.password);
-			amstore.put("amstore.webhcat.url", "http://"
-					+ webhcat.getJSONArray("host_components").getJSONObject(0)
-							.getJSONObject("HostRoles").getString("host_name")
-					+ ":50111/templeton");
+			amstore.put("amstore.webhcat.url", "http://" + webhcat.getJSONArray("host_components").getJSONObject(0)
+					.getJSONObject("HostRoles").getString("host_name") + ":50111/templeton");
 
 		} catch (Exception e) {
 			// COMPAT: Some older Ambaris had webhcat separate from Hive
 			try {
-				JSONObject webhcat = AmbariStoreHelper.readJsonFromUrl(baseurl
-						+ "/services/WEBHCAT/components/WEBHCAT_SERVER",
-						cluster.username, cluster.password);
-				amstore.put("amstore.webhcat.url", "http://"
-						+ webhcat.getJSONArray("host_components")
-								.getJSONObject(0).getJSONObject("HostRoles")
-								.getString("host_name") + ":50111/templeton");
+				JSONObject webhcat = AmbariStoreHelper.readJsonFromUrl(
+						baseurl + "/services/WEBHCAT/components/WEBHCAT_SERVER", cluster.username, cluster.password);
+				amstore.put("amstore.webhcat.url", "http://" + webhcat.getJSONArray("host_components").getJSONObject(0)
+						.getJSONObject("HostRoles").getString("host_name") + ":50111/templeton");
 			} catch (Exception e2) {
 
 			}
@@ -604,13 +510,10 @@ public class MainStoreApplication extends StoreApplicationView {
 
 		// HIVESERVER2
 		try {
-			JSONObject hiveserver2 = AmbariStoreHelper.readJsonFromUrl(baseurl
-					+ "/services/HIVE/components/HIVE_SERVER",
-					cluster.username, cluster.password);
-			amstore.put("amstore.hiveserver2.host",
-					hiveserver2.getJSONArray("host_components")
-							.getJSONObject(0).getJSONObject("HostRoles")
-							.getString("host_name"));
+			JSONObject hiveserver2 = AmbariStoreHelper.readJsonFromUrl(
+					baseurl + "/services/HIVE/components/HIVE_SERVER", cluster.username, cluster.password);
+			amstore.put("amstore.hiveserver2.host", hiveserver2.getJSONArray("host_components").getJSONObject(0)
+					.getJSONObject("HostRoles").getString("host_name"));
 			amstore.put("amstore.hiveserver2.port", "10000");
 			// TODO: get proper port and AUTH
 			amstore.put("amstore.hiveserver2.auth", "auth=NONE");
@@ -634,17 +537,14 @@ public class MainStoreApplication extends StoreApplicationView {
 	 * yourObject = (YourObject) SerializationUtils.deserialize(byte[] data)
 	 */
 	public List<String> getPostInstallTasks() throws IOException {
-		
-		
-		String url = "/api/v1/views/" + this.getViewName() + "/versions/"
-				+ this.version + "/instances/" + this.instanceName
-				+ "/resources/taskmanager/postinstalltasks";
-	
-		String tasks = AmbariStoreHelper.doGet(viewContext.getURLStreamProvider(),
-				ambariViews, url);
-		
+
+		String url = "/api/v1/views/" + this.getViewName() + "/versions/" + this.version + "/instances/"
+				+ this.instanceName + "/resources/taskmanager/postinstalltasks";
+
+		String tasks = AmbariStoreHelper.doGet(viewContext.getURLStreamProvider(), ambariViews, url);
+
 		// TODO: DELETE this. Fix for multiple admins above.
-		String oldtasks = viewContext.getInstanceData("post-install-tasks");
+		//String oldtasks = viewContext.getInstanceData("post-install-tasks");
 
 		List<String> tasklist = new ArrayList<String>();
 		if (tasks == null || tasks.equals("")) {
@@ -653,8 +553,7 @@ public class MainStoreApplication extends StoreApplicationView {
 
 		try {
 			org.json.simple.parser.JSONParser parser = new org.json.simple.parser.JSONParser();
-			org.json.simple.JSONArray array = (org.json.simple.JSONArray) parser
-					.parse(tasks);
+			org.json.simple.JSONArray array = (org.json.simple.JSONArray) parser.parse(tasks);
 			for (int i = 0; i < array.size(); i++) {
 				String uri = (String) array.get(i);
 				tasklist.add(uri);
@@ -671,27 +570,25 @@ public class MainStoreApplication extends StoreApplicationView {
 		List<StoreException> exceptions = new LinkedList<StoreException>();
 
 		List<String> tasks = null;
-		
+
 		try {
 			tasks = getPostInstallTasks();
 		} catch (IOException e) {
-			exceptions.add(new StoreException("Error: IOException getting Post-install tasks. "
-					+ e.toString(), CODE.ERROR));
+			exceptions.add(
+					new StoreException("Error: IOException getting Post-install tasks. " + e.toString(), CODE.ERROR));
 			return exceptions;
 		}
-		
+
 		for (String uri : tasks) {
 			LOG.debug("Processing uri: " + uri);
 
-			StoreApplication application = BackendStoreEndpoint
-					.netgetApplicationFromStoreByUri(uri);
+			StoreApplication application = BackendStoreEndpoint.netgetApplicationFromStoreByUri(uri);
 			if (application == null) {
 				LOG.warn("ERROR: application is NULL !");
 				continue;
 			}
 
-			String response = "Received from the backend:" + application.id
-					+ "\n";
+			String response = "Received from the backend:" + application.id + "\n";
 			response += application.instanceDisplayName + "\n";
 			response += application.description + "\n";
 			response += application.properties.size() + "\n";
@@ -701,8 +598,7 @@ public class MainStoreApplication extends StoreApplicationView {
 
 				try {
 					// TODO: dangerous. Should be encapsulated.
-					application
-							.setDesiredInstanceProperties(getMappedProperties(application));
+					application.setDesiredInstanceProperties(getMappedProperties(application));
 
 					Map<String, ViewInstanceDefinition> installedViews = getInstancedViews();
 					boolean isreinstall;
@@ -716,12 +612,9 @@ public class MainStoreApplication extends StoreApplicationView {
 					LOG.debug("Removing tasks from list.");
 					removePostInstallTask(uri);
 				} catch (ServiceFormattedException e) {
-					exceptions.add(new StoreException(
-							"ServiceFormattedException:" + e.toString(),
-							CODE.WARNING));
+					exceptions.add(new StoreException("ServiceFormattedException:" + e.toString(), CODE.WARNING));
 				} catch (IOException e) {
-					exceptions.add(new StoreException("IOException:"
-							+ e.toString(), CODE.WARNING));
+					exceptions.add(new StoreException("IOException:" + e.toString(), CODE.WARNING));
 				} catch (StoreException e) {
 					LOG.warn("StoreException:" + e.toString());
 					exceptions.add(e);
@@ -733,19 +626,15 @@ public class MainStoreApplication extends StoreApplicationView {
 					application.doInstallStage2(getAmbariCluster(), false);
 					removePostInstallTask(uri);
 				} catch (ServiceFormattedException e) {
-					exceptions.add(new StoreException(
-							"ServiceFormattedException:" + e.toString(),
-							CODE.WARNING));
+					exceptions.add(new StoreException("ServiceFormattedException:" + e.toString(), CODE.WARNING));
 				} catch (StoreException e) {
 					exceptions.add(e);
 				} catch (IOException e) {
-					exceptions.add(new StoreException("IOException:"
-							+ e.toString(), CODE.WARNING));
+					exceptions.add(new StoreException("IOException:" + e.toString(), CODE.WARNING));
 				}
 
 			} else {
-				throw new NotImplementedException(
-						"Installing unknown type not yet implemented.");
+				throw new NotImplementedException("Installing unknown type not yet implemented.");
 			}
 		}
 		return exceptions;
@@ -764,35 +653,34 @@ public class MainStoreApplication extends StoreApplicationView {
 	// context.putInstanceData
 	/*
 	 * $CURL -H "X-Requested-By: $agent" -X POST
-	 * 'http://localhost:8080/api/v1/views/AMBARI-STORE/versions/0.1.0/instances/store/resources/taskmanager/reconfigure'
-
-	 * NOTE: We cannot use the current logged in admin for this. Instead, we need to store
-	 * the instance data as the admin user defined in the Store properties (amstore.local.username)
+	 * 'http://localhost:8080/api/v1/views/AMBARI-STORE/versions/0.1.0/instances
+	 * /store/resources/taskmanager/reconfigure'
+	 * 
+	 * NOTE: We cannot use the current logged in admin for this. Instead, we
+	 * need to store the instance data as the admin user defined in the Store
+	 * properties (amstore.local.username)
 	 */
-	public void addPostInstallTask(String task)  throws IOException {
+	public void addPostInstallTask(String task) throws IOException {
 
 		/*
 		 * TODO: ERROR 500. This completely breaks Ambari.
 		 * viewContext.putInstanceData("post-install-tasks", app_id); INSTEAD:
 		 */
-		String url = "/api/v1/views/" + this.getViewName() + "/versions/"
-				+ this.version + "/instances/" + this.instanceName
-				+ "/resources/taskmanager/postinstalltasks";
+		String url = "/api/v1/views/" + this.getViewName() + "/versions/" + this.version + "/instances/"
+				+ this.instanceName + "/resources/taskmanager/postinstalltasks";
 		if (getPostInstallTasks().contains(task)) {
 			LOG.debug("Already added:" + task);
 			return;
 		}
-		AmbariStoreHelper.doPost(viewContext.getURLStreamProvider(),
-				ambariViews, url, task);
+		AmbariStoreHelper.doPost(viewContext.getURLStreamProvider(), ambariViews, url, task);
 		// Check that it was added correctly
 		if (!getPostInstallTasks().contains(task)) {
-			throw new RuntimeException(
-					"Failed to add post-install-task correctly");
+			throw new RuntimeException("Failed to add post-install-task correctly");
 		}
 	}
 
 	// For debugging
-	public void cleartasks()  throws IOException {
+	public void cleartasks() throws IOException {
 		List<String> updates = getPostUpdateTasks();
 		for (String task : updates) {
 			removePostUpdateTask(task);
@@ -812,40 +700,35 @@ public class MainStoreApplication extends StoreApplicationView {
 
 		// We call the TaskManagerService instead
 		String url = "";
-		url = "/api/v1/views/" + this.viewName + "/versions/" + this.version
-				+ "/instances/" + this.instanceName
-				+ "/resources/taskmanager/postinstalltasks/"
-				+ URLEncoder.encode(uri);
+		url = "/api/v1/views/" + this.viewName + "/versions/" + this.version + "/instances/" + this.instanceName
+				+ "/resources/taskmanager/postinstalltasks/" + URLEncoder.encode(uri);
 
 		LOG.debug("Attempting to delete: '" + url);
-		AmbariStoreHelper.doDelete(this.viewContext.getURLStreamProvider(),
-				this.ambariViews, url);
+		AmbariStoreHelper.doDelete(this.viewContext.getURLStreamProvider(), this.ambariViews, url);
 	}
 
 	// This function is specifically to work around a BUG in
 	// context.putInstanceData
 	/*
 	 * $CURL -H "X-Requested-By: $agent" -X POST
-	 * 'http://localhost:8080/api/v1/views/AMBARI-STORE/versions/0.1.0/instances/store/resources/taskmanager/reconfigure'
+	 * 'http://localhost:8080/api/v1/views/AMBARI-STORE/versions/0.1.0/instances
+	 * /store/resources/taskmanager/reconfigure'
 	 */
 	public void addPostUpdateTask(String task) {
 		/*
 		 * TODO: ERROR 500. This completely breaks Ambari.
 		 * viewContext.putInstanceData("post-install-tasks", app_id); INSTEAD:
 		 */
-		String url = "/api/v1/views/" + this.getViewName() + "/versions/"
-				+ this.version + "/instances/" + this.instanceName
-				+ "/resources/taskmanager/postupdatetasks";
+		String url = "/api/v1/views/" + this.getViewName() + "/versions/" + this.version + "/instances/"
+				+ this.instanceName + "/resources/taskmanager/postupdatetasks";
 		if (getPostUpdateTasks().contains(task)) {
 			LOG.debug("Already added:" + task);
 			return;
 		}
-		AmbariStoreHelper.doPost(viewContext.getURLStreamProvider(),
-				ambariViews, url, task);
+		AmbariStoreHelper.doPost(viewContext.getURLStreamProvider(), ambariViews, url, task);
 		// Check that it was added correctly
 		if (!getPostUpdateTasks().contains(task)) {
-			throw new RuntimeException(
-					"Failed to add post-install-task correctly");
+			throw new RuntimeException("Failed to add post-install-task correctly");
 		}
 	}
 
@@ -857,14 +740,11 @@ public class MainStoreApplication extends StoreApplicationView {
 
 		// We call the TaskManagerService instead
 		String url = "";
-		url = "/api/v1/views/" + this.viewName + "/versions/" + this.version
-				+ "/instances/" + this.instanceName
-				+ "/resources/taskmanager/postupdatetasks/"
-				+ URLEncoder.encode(uri);
+		url = "/api/v1/views/" + this.viewName + "/versions/" + this.version + "/instances/" + this.instanceName
+				+ "/resources/taskmanager/postupdatetasks/" + URLEncoder.encode(uri);
 
 		LOG.debug("Attempting to delete: '" + url);
-		AmbariStoreHelper.doDelete(this.viewContext.getURLStreamProvider(),
-				this.ambariViews, url);
+		AmbariStoreHelper.doDelete(this.viewContext.getURLStreamProvider(), this.ambariViews, url);
 	}
 
 	/*
@@ -883,8 +763,7 @@ public class MainStoreApplication extends StoreApplicationView {
 		}
 		try {
 			org.json.simple.parser.JSONParser parser = new org.json.simple.parser.JSONParser();
-			org.json.simple.JSONArray array = (org.json.simple.JSONArray) parser
-					.parse(tasks);
+			org.json.simple.JSONArray array = (org.json.simple.JSONArray) parser.parse(tasks);
 			for (int i = 0; i < array.size(); i++) {
 				String uri = (String) array.get(i);
 				tasklist.add(uri);
@@ -905,8 +784,7 @@ public class MainStoreApplication extends StoreApplicationView {
 			LOG.debug("Processing uri: " + uri);
 			try {
 
-				StoreApplication newApplication = BackendStoreEndpoint
-						.netgetApplicationFromStoreByUri(uri);
+				StoreApplication newApplication = BackendStoreEndpoint.netgetApplicationFromStoreByUri(uri);
 				if (newApplication == null) {
 					LOG.warn("ERROR: Application " + uri + "Not found.");
 					removePostUpdateTask(uri);
@@ -914,12 +792,9 @@ public class MainStoreApplication extends StoreApplicationView {
 				}
 
 				// Get the installed version
-				StoreApplication installedApplication = this
-						.getInstalledApplicationByAppId(newApplication
-								.getApp_id());
+				StoreApplication installedApplication = this.getInstalledApplicationByAppId(newApplication.getApp_id());
 
-				String response = "Received from the backend:"
-						+ installedApplication.id + "\n";
+				String response = "Received from the backend:" + installedApplication.id + "\n";
 				response += installedApplication.instanceDisplayName + "\n";
 				response += installedApplication.description + "\n";
 				response += installedApplication.properties.size() + "\n";
@@ -928,14 +803,11 @@ public class MainStoreApplication extends StoreApplicationView {
 				// Map to current properties
 				// Exception: main store view would carry over old settings.
 				if (newApplication.isStore()) {
-					newApplication.setDesiredInstanceProperties(this
-							.getProperties());
+					newApplication.setDesiredInstanceProperties(this.getProperties());
 				} else {
-					newApplication
-							.setDesiredInstanceProperties(getMappedProperties(newApplication));
+					newApplication.setDesiredInstanceProperties(getMappedProperties(newApplication));
 				}
-				installedApplication.doUpdateStage2(getAmbariViews(),
-						newApplication);
+				installedApplication.doUpdateStage2(getAmbariViews(), newApplication);
 
 				// If all goes well, remove task from list.
 				LOG.debug("Removing update task from list.");

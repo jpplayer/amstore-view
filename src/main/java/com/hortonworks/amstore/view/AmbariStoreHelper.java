@@ -309,6 +309,19 @@ public class AmbariStoreHelper {
 		}
 	}
 
+	
+	/* 
+	 * JSON Utility function. 
+	 * TODO: Probably should be somewhere else.
+	 */
+	public static boolean _b(JSONObject o, String s) {
+		try {
+			return o.getBoolean(s);
+		} catch (Exception e) {
+			return false;
+		}
+	}
+	
 	/* 
 	 * JSON Utility function. 
 	 * TODO: Probably should be somewhere else.
