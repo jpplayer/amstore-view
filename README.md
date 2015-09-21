@@ -28,7 +28,7 @@ curl http://amstore.cloudapp.net/amstore/install_store.sh | bash
 ```
    git clone https://github.com/jpplayer/amstore-daemon.git
    cd amstore-daemon && sh build.sh && sh install.sh
-   /usr/local/bin/amstore-daemon.sh start
+   /usr/lib/amstore-daemon/amstore-daemon.sh restart
    cd /var/lib/ambari-server/resources/views
    curl -O http://amstore.cloudapp.net/amstore/ambari-store-0.1.5.jar
    ambari-server restart
